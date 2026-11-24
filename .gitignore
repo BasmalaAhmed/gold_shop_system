@@ -1,0 +1,24 @@
+# Dart
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+
+# Flutter
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Android
+**/.gradle/
+**/cxx/
+**/.cxx/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Generated files
+*.freezed.dart
+*.g.dart
