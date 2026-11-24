@@ -14,6 +14,7 @@ class GoldSaleDraft {
     required this.otherMethod,
     this.tradeIn,
     this.savedAt,
+    this.pendingApprovalRequestId,
   });
 
   final List<GoldSaleCartItem> items;
@@ -24,6 +25,7 @@ class GoldSaleDraft {
   final GoldSalePaymentMethod otherMethod;
   final TradeInInput? tradeIn;
   final DateTime? savedAt;
+  final int? pendingApprovalRequestId;
 
   Map<String, dynamic> toJson() => {
     'items': items.map((item) {
@@ -44,6 +46,7 @@ class GoldSaleDraft {
     }).toList(),
     'discountPercent': discountPercent,
     'supervisorApprovalNumber': supervisorApprovalNumber,
+    'pendingApprovalRequestId': pendingApprovalRequestId,
     'cashAmountText': cashAmountText,
     'otherAmountText': otherAmountText,
     'otherMethod': otherMethod.name,
@@ -97,6 +100,7 @@ class GoldSaleDraft {
       items: items,
       discountPercent: json['discountPercent'] as int,
       supervisorApprovalNumber: json['supervisorApprovalNumber'] as String?,
+      pendingApprovalRequestId: json['pendingApprovalRequestId'] as int?,
       cashAmountText: json['cashAmountText'] as String,
       otherAmountText: json['otherAmountText'] as String,
       otherMethod: GoldSalePaymentMethod.values.byName(

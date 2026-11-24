@@ -56,41 +56,54 @@ class _SalePaymentViewState extends State<SalePaymentView> {
   int get _remainingPiasters => (widget.amountDuePiasters - _cashPaidPiasters)
       .clamp(0, widget.amountDuePiasters);
 
-  void _submit() async {
-    final payments = <GoldSalePayment>[];
-    if (_cashPaidPiasters > 0) {
-      payments.add(
-        GoldSalePayment(
-          method: GoldSalePaymentMethod.cash,
-          amountPiasters: _cashPaidPiasters,
-        ),
-      );
-    }
-    if (_remainingPiasters > 0) {
-      payments.add(
-        GoldSalePayment(
-          method: _secondaryMethod,
-          amountPiasters: _remainingPiasters,
-        ),
-      );
-    }
+  bool _isSubmitting = false;
 
+  Future<void> _submit() async {
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
+    final payments = <GoldSalePayment>[];
     try {
-      await widget.onCompleteSale(payments);
-      if (!mounted) return;
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => SaleSuccessScreen(
-            amountDuePiasters: widget.amountDuePiasters,
-            cashPaidPiasters: _cashPaidPiasters,
-            secondaryPaidPiasters: _remainingPiasters,
-            secondaryMethodName: _methodLabels[_secondaryMethod] ?? 'إنستاباي',
-            goldPricePiasters: widget.currentGoldPricePiasters,
-            onNewInvoice: widget.onNewInvoice,
+      if (_cashPaidPiasters > 0) {
+        payments.add(
+          GoldSalePayment(
+            method: GoldSalePaymentMethod.cash,
+            amountPiasters: _cashPaidPiasters,
           ),
-        ),
-      );
-    } catch (_) {}
+        );
+      }
+      if (_remainingPiasters > 0) {
+        payments.add(
+          GoldSalePayment(
+            method: _secondaryMethod,
+            amountPiasters: _remainingPiasters,
+          ),
+        );
+      }
+
+      try {
+        await widget.onCompleteSale(payments);
+        if (!mounted) return;
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => SaleSuccessScreen(
+              amountDuePiasters: widget.amountDuePiasters,
+              cashPaidPiasters: _cashPaidPiasters,
+              secondaryPaidPiasters: _remainingPiasters,
+              secondaryMethodName:
+                  _methodLabels[_secondaryMethod] ?? 'إنستاباي',
+              goldPricePiasters: widget.currentGoldPricePiasters,
+              onNewInvoice: widget.onNewInvoice,
+            ),
+          ),
+        );
+      } catch (_) {}
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
   }
 
   @override
@@ -327,7 +340,7 @@ class _SalePaymentViewState extends State<SalePaymentView> {
                 child: SizedBox(
                   height: 52,
                   child: ElevatedButton.icon(
-                    onPressed: _submit,
+                    onPressed: _isSubmitting ? null : _submit,
                     icon: const Icon(Icons.check, size: 18),
                     label: const Text(
                       'تأكيد وتسجيل الفاتورة',
@@ -372,10 +385,7 @@ class _SalePaymentViewState extends State<SalePaymentView> {
         ),
         child: Text(
           label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ),
     );

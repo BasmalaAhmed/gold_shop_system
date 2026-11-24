@@ -33,6 +33,9 @@ class TabletInvoiceContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lineResults = cart.lineResults;
+    final pendingItemsLabel = cart.items.isEmpty
+        ? ''
+        : cart.items.map((item) => '${item.name} (${item.code})').join('، ');
 
     return SingleChildScrollView(
       child: Column(
@@ -89,7 +92,7 @@ class TabletInvoiceContent extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppTheme.amberBorder),
               ),
-              child: const Row(
+              child: Row(
                 children: [
                   Expanded(
                     child: Column(
@@ -105,8 +108,8 @@ class TabletInvoiceContent extends StatelessWidget {
                         ),
                         SizedBox(height: 2),
                         Text(
-                          'خصم 15% على G-1042، سنكمل تلقائيًا فور الرد.',
-                          style: TextStyle(
+                          'خصم ${cart.discountPercent}% على $pendingItemsLabel، سنكمل تلقائيًا فور الرد.',
+                          style: const TextStyle(
                             fontSize: 11,
                             color: AppTheme.amberText,
                           ),

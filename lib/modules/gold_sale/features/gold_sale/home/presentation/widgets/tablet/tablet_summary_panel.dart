@@ -3,6 +3,7 @@ import 'package:gold_shop_app/modules/gold_sale/core/theme/app_theme.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_cart.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_payment.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_payment_method.dart';
+import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/home/presentation/widgets/tablet/summary_row.dart';
 
 class TabletSummaryPanel extends StatefulWidget {
   const TabletSummaryPanel({
@@ -74,25 +75,38 @@ class _TabletSummaryPanelState extends State<TabletSummaryPanel> {
         widget.cart.amountDuePiasters,
       );
 
-  void _submitPayment() async {
+  bool _isSubmitting = false;
+
+  Future<void> _submitPayment() async {
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
     final payments = <GoldSalePayment>[];
-    if (_cashPaidPiasters > 0) {
-      payments.add(
-        GoldSalePayment(
-          method: GoldSalePaymentMethod.cash,
-          amountPiasters: _cashPaidPiasters,
-        ),
-      );
+
+    try {
+      if (_cashPaidPiasters > 0) {
+        payments.add(
+          GoldSalePayment(
+            method: GoldSalePaymentMethod.cash,
+            amountPiasters: _cashPaidPiasters,
+          ),
+        );
+      }
+      if (_remainingPiasters > 0) {
+        payments.add(
+          GoldSalePayment(
+            method: _secondaryMethod,
+            amountPiasters: _remainingPiasters,
+          ),
+        );
+      }
+      await widget.onConfirmPayment(payments);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
-    if (_remainingPiasters > 0) {
-      payments.add(
-        GoldSalePayment(
-          method: _secondaryMethod,
-          amountPiasters: _remainingPiasters,
-        ),
-      );
-    }
-    await widget.onConfirmPayment(payments);
   }
 
   @override
@@ -146,19 +160,19 @@ class _TabletSummaryPanelState extends State<TabletSummaryPanel> {
         const SizedBox(height: 20),
 
         if (isEmpty) ...[
-          _summaryRow(label: 'القطع', value: '0 من 2'),
+          SummaryRow(label: 'القطع', value: '0 من 2'),
         ] else if (hasTradeIn) ...[
-          _summaryRow(label: 'القطع', value: totalEgp),
+          SummaryRow(label: 'القطع', value: totalEgp),
           const SizedBox(height: 12),
-          _summaryRow(
+          SummaryRow(
             label: 'البدل (يُخصم)',
             value: tradeInValueEgp,
             isGreen: true,
           ),
         ] else ...[
-          _summaryRow(label: 'القطع', value: '$itemsCount من 2'),
+          SummaryRow(label: 'القطع', value: '$itemsCount من 2'),
           const SizedBox(height: 12),
-          _summaryRow(
+          SummaryRow(
             label: 'الخصم على المصنعية',
             value: widget.isPendingApproval
                 ? '$discountEgp (بانتظار)'
@@ -167,7 +181,7 @@ class _TabletSummaryPanelState extends State<TabletSummaryPanel> {
             isAmber: widget.isPendingApproval,
           ),
           const SizedBox(height: 12),
-          _summaryRow(label: 'الضريبة', value: taxEgp),
+          SummaryRow(label: 'الضريبة', value: taxEgp),
         ],
 
         const Spacer(),
@@ -412,7 +426,7 @@ class _TabletSummaryPanelState extends State<TabletSummaryPanel> {
           SizedBox(
             height: 48,
             child: ElevatedButton.icon(
-              onPressed: _submitPayment,
+              onPressed: _isSubmitting ? null : _submitPayment,
               icon: const Icon(Icons.check, size: 18),
               label: const Text(
                 'تأكيد وتسجيل الفاتورة',
@@ -474,35 +488,6 @@ class _TabletSummaryPanelState extends State<TabletSummaryPanel> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _summaryRow({
-    required String label,
-    required String value,
-    bool isGreen = false,
-    bool isAmber = false,
-  }) {
-    Color textColor = AppTheme.textPrimary;
-    if (isGreen) textColor = AppTheme.greenText;
-    if (isAmber) textColor = AppTheme.amberText;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: textColor,
-          ),
-        ),
-      ],
     );
   }
 }

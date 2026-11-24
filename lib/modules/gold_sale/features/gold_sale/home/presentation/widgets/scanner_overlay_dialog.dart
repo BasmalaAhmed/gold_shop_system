@@ -36,7 +36,7 @@ class ScannerOverlayDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const catalog = GoldSaleDemoCatalog();
+    final catalog = GoldSaleDemoCatalog();
     final demoItems = [
       catalog.findByCode('DEMO-1001'),
       catalog.findByCode('DEMO-1002'),

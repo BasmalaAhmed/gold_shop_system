@@ -110,6 +110,38 @@ class MockApprovalApi implements ApprovalApi {
     return result;
   }
 
+  Future<ApprovalRequest> createRequest({
+    required String employeeName,
+    required String branchName,
+    required int amountInPiastres,
+    required String reason,
+    String? attentionMessage,
+  }) async {
+    await Future.delayed(responseDelay);
+
+    if (scenario == MockApiScenario.failBeforeExecution) {
+      throw const MockApiNetworkException('Request failed before execution');
+    }
+
+    final nextId = _requests.keys.isEmpty
+        ? 1
+        : _requests.keys.reduce((a, b) => a > b ? a : b) + 1;
+
+    final request = ApprovalRequest(
+      requestId: nextId,
+      employeeName: employeeName,
+      branchName: branchName,
+      amountInPiastres: amountInPiastres,
+      reason: reason,
+      version: 1,
+      status: ApprovalStatus.pending,
+      attentionMessage: attentionMessage,
+      requestedAt: _now(),
+    );
+    _requests[nextId] = request;
+    return request;
+  }
+
   void simulateExternalChange(
     int requestId, {
     int? amountInPiastres,

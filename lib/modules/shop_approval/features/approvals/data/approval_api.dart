@@ -5,6 +5,14 @@ import 'package:gold_shop_app/modules/shop_approval/models/approval_request.dart
 abstract class ApprovalApi {
   Future<List<ApprovalRequest>> fetchRequests();
 
+  Future<ApprovalRequest> createRequest({
+    required String employeeName,
+    required String branchName,
+    required int amountInPiastres,
+    required String reason,
+    String? attentionMessage,
+  });
+
   Future<ApprovalDecisionResult> submitDecision(
     ApprovalDecisionCommand command,
   );

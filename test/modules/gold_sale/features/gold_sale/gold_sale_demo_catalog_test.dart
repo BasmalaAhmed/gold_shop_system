@@ -4,7 +4,7 @@ import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_i
 
 void main() {
   group('GoldSaleDemoCatalog', () {
-    const catalog = GoldSaleDemoCatalog();
+    final catalog = GoldSaleDemoCatalog();
 
     test('finds an item by code regardless of spaces or letter case', () {
       final item = catalog.findByCode(' demo-1001 ');

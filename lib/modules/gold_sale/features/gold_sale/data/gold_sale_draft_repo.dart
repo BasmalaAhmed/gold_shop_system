@@ -23,6 +23,7 @@ class GoldSaleDraftRepo {
     otherMethod: draft.otherMethod,
     tradeIn: draft.tradeIn,
     savedAt: savedAt,
+    pendingApprovalRequestId: draft.pendingApprovalRequestId,
   );
 
   final json = jsonEncode(draftToSave.toJson());

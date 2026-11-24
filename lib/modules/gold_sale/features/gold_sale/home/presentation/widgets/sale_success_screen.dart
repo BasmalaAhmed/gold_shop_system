@@ -37,63 +37,68 @@ class SaleSuccessScreen extends StatelessWidget {
     );
     final goldPriceEgp = PriceFormatter.formatPiasters(goldPricePiasters);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          isTablet ? 'فاتورة بيع · فرع المهندسين' : 'فاتورة بيع',
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          _handleNewInvoice(context);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            isTablet ? 'فاتورة بيع · فرع المهندسين' : 'فاتورة بيع',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded, size: 24),
-          onPressed: () => _handleNewInvoice(context),
-        ),
-        actions: isTablet
-            ? [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: UnifiedTheme.emerald,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'سعر جرام 21 المثبّت: $goldPriceEgp ج.م',
-                        style: const TextStyle(
+          leading: IconButton(
+            icon: const Icon(Icons.close_rounded, size: 24),
+            onPressed: () => _handleNewInvoice(context),
+          ),
+          actions: isTablet
+              ? [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
                           color: UnifiedTheme.emerald,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'سعر جرام 21 المثبّت: $goldPriceEgp ج.م',
+                          style: const TextStyle(
+                            color: UnifiedTheme.emerald,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
                   ),
+                ]
+              : null,
+        ),
+        body: SafeArea(
+          child: isTablet
+              ? _buildTabletSuccess(
+                  context: context,
+                  amountDueEgp: amountDueEgp,
+                  cashPaidEgp: cashPaidEgp,
+                  secondaryPaidEgp: secondaryPaidEgp,
+                  goldPriceEgp: goldPriceEgp,
+                )
+              : _buildMobileSuccess(
+                  amountDueEgp: amountDueEgp,
+                  cashPaidEgp: cashPaidEgp,
+                  secondaryPaidEgp: secondaryPaidEgp,
+                  goldPriceEgp: goldPriceEgp,
+                  context: context,
                 ),
-              ]
-            : null,
-      ),
-      body: SafeArea(
-        child: isTablet
-            ? _buildTabletSuccess(
-                context: context,
-                amountDueEgp: amountDueEgp,
-                cashPaidEgp: cashPaidEgp,
-                secondaryPaidEgp: secondaryPaidEgp,
-                goldPriceEgp: goldPriceEgp,
-              )
-            : _buildMobileSuccess(
-                amountDueEgp: amountDueEgp,
-                cashPaidEgp: cashPaidEgp,
-                secondaryPaidEgp: secondaryPaidEgp,
-                goldPriceEgp: goldPriceEgp,
-                context: context,
-              ),
+        ),
       ),
     );
   }
@@ -125,16 +130,16 @@ class SaleSuccessScreen extends StatelessWidget {
           const SizedBox(height: 20),
           const Text(
             'تم تسجيل الفاتورة',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           Text(
             'المستحق $amountDueEgp · كاش $cashPaidEgp · $secondaryMethodName $secondaryPaidEgp · سعر 21 ثابت $goldPriceEgp · $invoiceNumber',
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, color: UnifiedTheme.textSecondary),
+            style: const TextStyle(
+              fontSize: 13,
+              color: UnifiedTheme.textSecondary,
+            ),
           ),
           const SizedBox(height: 32),
           SizedBox(
@@ -195,10 +200,7 @@ class SaleSuccessScreen extends StatelessWidget {
           const Center(
             child: Text(
               'تم تسجيل الفاتورة',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(height: 6),
@@ -267,7 +269,10 @@ class SaleSuccessScreen extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 13, color: UnifiedTheme.textSecondary),
+          style: const TextStyle(
+            fontSize: 13,
+            color: UnifiedTheme.textSecondary,
+          ),
         ),
         Text(
           value,

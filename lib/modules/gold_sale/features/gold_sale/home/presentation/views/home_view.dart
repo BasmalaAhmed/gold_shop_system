@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:gold_shop_app/core/unified_theme.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/data/gold_sale_demo_catalog.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/data/gold_sale_draft.dart';
@@ -25,6 +26,9 @@ import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/home/presenta
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/home/presentation/widgets/scrap_gold_bottom_sheet.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/home/presentation/widgets/tablet/tablet_body.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/home/presentation/widgets/labor_pricing_dialog.dart';
+import 'package:gold_shop_app/modules/shop_approval/features/approvals/presentation/manager/approval_requests_cubit/approval_requests_cubit.dart';
+import 'package:gold_shop_app/modules/shop_approval/features/approvals/presentation/manager/approval_requests_cubit/approval_requests_state.dart';
+import 'package:gold_shop_app/modules/shop_approval/models/approval_request.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key, required this.priceRepository});
@@ -36,7 +40,8 @@ class HomeView extends StatefulWidget {
 }
 
 class _HomeViewState extends State<HomeView> {
-  final _catalog = const GoldSaleDemoCatalog();
+  int? _pendingApprovalRequestId;
+  final _catalog = GoldSaleDemoCatalog();
   final _cart = GoldSaleCart();
   final _draftRepository = GoldSaleDraftRepo();
   final _recordRepository = GoldSaleRecordRepo();
@@ -80,6 +85,15 @@ class _HomeViewState extends State<HomeView> {
       final draft = await _draftRepository.load();
       if (!mounted) return;
       if (draft != null) {
+        final approvalNum = draft.supervisorApprovalNumber?.trim() ?? '';
+        final parsedReqId = approvalNum.startsWith('REQ-')
+            ? int.tryParse(approvalNum.substring(4))
+            : null;
+        final pendingId = draft.pendingApprovalRequestId ?? parsedReqId;
+        final isPending =
+            draft.discountPercent > 10 &&
+            (pendingId != null || approvalNum.startsWith('REQ-'));
+
         setState(() {
           _cart.restore(
             items: draft.items,
@@ -90,6 +104,7 @@ class _HomeViewState extends State<HomeView> {
           _cashAmountText = draft.cashAmountText;
           _otherAmountText = draft.otherAmountText;
           _otherPaymentMethod = draft.otherMethod;
+          _pendingApprovalRequestId = isPending ? pendingId : null;
           _isPendingApproval = draft.discountPercent > 10;
           _lastSavedAt = draft.savedAt;
         });
@@ -110,6 +125,9 @@ class _HomeViewState extends State<HomeView> {
       cashAmountText: _cashAmountText,
       otherAmountText: _otherAmountText,
       otherMethod: _otherPaymentMethod,
+      pendingApprovalRequestId: _isPendingApproval
+          ? _pendingApprovalRequestId
+          : null,
     );
 
     _saveQueue = _saveQueue.catchError((_) {}).then<void>((_) async {
@@ -328,19 +346,60 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  void _applyDiscount(int percent, String? approvalNumber) {
-    try {
-      setState(() {
-        _isPendingApproval = percent > 10;
-        _cart.setDiscount(
-          discountPercent: percent,
-          supervisorApprovalNumber: approvalNumber,
-        );
-      });
-      _saveDraft();
-    } catch (_) {
-      _showMessage('الخصم غير صالح.');
+  Future<void> _applyDiscount(int percent, String? approvalNumber) async {
+    if (percent <= 10) {
+      try {
+        _cart.setDiscount(discountPercent: percent);
+        setState(() {
+          _isPendingApproval = false;
+          _pendingApprovalRequestId = null;
+        });
+        _saveDraft();
+      } catch (_) {
+        _showMessage('الخصم غير صالح.');
+      }
+      return;
     }
+    try {
+      _cart.setDiscount(
+        discountPercent: percent,
+        supervisorApprovalNumber: 'Pending',
+      );
+    } catch (_) {
+      _showMessage('الخصم غير صالح');
+      return;
+    }
+
+    final itemsLabel = _cart.items
+        .map((e) => '${e.name} (${e.code})')
+        .join('، ');
+    final discountAmount = _cart.lineResults.fold<int>(
+      0,
+      (sum, r) => sum + r.discountPiasters,
+    );
+    final created = await context
+        .read<ApprovalRequestsCubit>()
+        .submitDiscountApprovalRequest(
+          employeeName: 'كاشير المبيعات',
+          branchName: 'فرع المهندسين',
+          amountInPiastres: discountAmount,
+          reason: 'طلب خصم $percent% على $itemsLabel',
+        );
+    if (!mounted) return;
+    if (created == null) {
+      _cart.setDiscount(discountPercent: 10);
+      _showMessage('تعذر إرسال طلب الموافقة.');
+      return;
+    }
+    setState(() {
+      _pendingApprovalRequestId = created.requestId;
+      _isPendingApproval = true;
+      _cart.setDiscount(
+        discountPercent: percent,
+        supervisorApprovalNumber: 'REQ-${created.requestId}',
+      );
+    });
+    _saveDraft();
   }
 
   void _openDiscountSheet() {
@@ -420,6 +479,20 @@ class _HomeViewState extends State<HomeView> {
     await _saveQueue;
     await _recordRepository.add(record);
     await _draftRepository.clear();
+    for (final item in _cart.items) {
+      _catalog.markSold(item.code);
+    }
+    if (mounted) {
+      setState(() {
+        _cart.clear();
+        _invoiceError = null;
+        _isPendingApproval = false;
+        _pendingApprovalRequestId = null;
+        _isTabletPaymentMode = false;
+        _cashAmountText = '';
+        _otherAmountText = '';
+      });
+    }
   }
 
   Future<void> _onTabletPaymentConfirmed(List<GoldSalePayment> payments) async {
@@ -513,79 +586,109 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final bool isTablet = constraints.maxWidth >= 720;
-
-        return Scaffold(
-          backgroundColor: UnifiedTheme.background,
-          appBar: HomeAppBar(
-            isTablet: isTablet,
-            goldPriceEgp: _currentGoldPricePiasters / 100.0,
-            buyPriceEgp: _currentBuyPricePiasters / 100.0,
-            onRefresh: _refreshPrices,
-            lastSavedAt: _lastSavedAt,
-            onSaveDraft: () async {
-              try {
-                await _saveDraft();
-
-                if (mounted) {
-                  _showMessage('تم حفظ المسودة بنجاح.');
-                }
-
-                return true;
-              } catch (_) {
-                if (mounted) {
-                  _showMessage('تعذر حفظ المسودة.');
-                }
-
-                return false;
-              }
-            },
-            onDeleteInvoice: _confirmDeleteInvoice,
-          ),
-          body: _isLoadingDraft
-              ? const Center(child: CircularProgressIndicator())
-              : SafeArea(
-                  child: isTablet
-                      ? TabletBody(
-                          cart: _cart,
-                          isPendingApproval: _isPendingApproval,
-                          isPaymentMode: _isTabletPaymentMode,
-                          invoiceError: _invoiceError,
-                          onPayPressed: () {
-                            setState(() => _isTabletPaymentMode = true);
-                          },
-                          onBackToInvoice: () {
-                            setState(() => _isTabletPaymentMode = false);
-                          },
-                          onCancelPendingDiscount: _cancelPendingDiscount,
-                          onConfirmPayment: _onTabletPaymentConfirmed,
-                          onShowCalculation: _showCalculation,
-                          onEditDiscount: _openDiscountSheet,
-                          onRemove: _removeItem,
-                          onOpenScanner: _openScanner,
-                          onOpenManualCode: _openManualCode,
-                          onOpenTradeIn: _openTradeInSheet,
-                        )
-                      : MobileBody(
-                          cart: _cart,
-                          goldPriceEgp: _currentGoldPricePiasters / 100.0,
-                          isPendingApproval: _isPendingApproval,
-                          invoiceError: _invoiceError,
-                          onRefreshPrices: _refreshPrices,
-                          onOpenScanner: _openScanner,
-                          onOpenManualCode: _openManualCode,
-                          onShowCalculation: _showCalculation,
-                          onEditDiscount: _openDiscountSheet,
-                          onRemove: _removeItem,
-                          onAddTradeIn: _openTradeInSheet,
-                          onCancelPending: _cancelPendingDiscount,
-                          onPay: _openPaymentScreen,
-                        ),
-                ),
-        );
+    return BlocListener<ApprovalRequestsCubit, ApprovalRequestsState>(
+      listener: (context, state) {
+        final success = state as ApprovalRequestsSuccess;
+        final req = success.requests
+            .where((r) => r.requestId == _pendingApprovalRequestId)
+            .firstOrNull;
+        if (req == null) return;
+        if (req.status == ApprovalStatus.approved) {
+          setState(() {
+            _isPendingApproval = false;
+            _pendingApprovalRequestId = null;
+            _cart.setDiscount(
+              discountPercent: _cart.discountPercent,
+              supervisorApprovalNumber: 'APR-${req.requestId}',
+            );
+          });
+          _saveDraft();
+          final isTablet = MediaQuery.of(context).size.width >= 720;
+          if (isTablet) {
+            setState(() => _isTabletPaymentMode = true);
+          } else {
+            _openPaymentScreen();
+          }
+        } else if (req.status == ApprovalStatus.rejected) {
+          _cancelPendingDiscount();
+          _pendingApprovalRequestId = null;
+          _showMessage('تم رفض طلب الخصم، تم الرجوع إلى 10%.');
+        }
       },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool isTablet = constraints.maxWidth >= 720;
+
+          return Scaffold(
+            backgroundColor: UnifiedTheme.background,
+            appBar: HomeAppBar(
+              isTablet: isTablet,
+              goldPriceEgp: _currentGoldPricePiasters / 100.0,
+              buyPriceEgp: _currentBuyPricePiasters / 100.0,
+              onRefresh: _refreshPrices,
+              lastSavedAt: _lastSavedAt,
+              onSaveDraft: () async {
+                try {
+                  await _saveDraft();
+
+                  if (mounted) {
+                    _showMessage('تم حفظ المسودة بنجاح.');
+                  }
+
+                  return true;
+                } catch (_) {
+                  if (mounted) {
+                    _showMessage('تعذر حفظ المسودة.');
+                  }
+
+                  return false;
+                }
+              },
+              onDeleteInvoice: _confirmDeleteInvoice,
+            ),
+            body: _isLoadingDraft
+                ? const Center(child: CircularProgressIndicator())
+                : SafeArea(
+                    child: isTablet
+                        ? TabletBody(
+                            cart: _cart,
+                            isPendingApproval: _isPendingApproval,
+                            isPaymentMode: _isTabletPaymentMode,
+                            invoiceError: _invoiceError,
+                            onPayPressed: () {
+                              setState(() => _isTabletPaymentMode = true);
+                            },
+                            onBackToInvoice: () {
+                              setState(() => _isTabletPaymentMode = false);
+                            },
+                            onCancelPendingDiscount: _cancelPendingDiscount,
+                            onConfirmPayment: _onTabletPaymentConfirmed,
+                            onShowCalculation: _showCalculation,
+                            onEditDiscount: _openDiscountSheet,
+                            onRemove: _removeItem,
+                            onOpenScanner: _openScanner,
+                            onOpenManualCode: _openManualCode,
+                            onOpenTradeIn: _openTradeInSheet,
+                          )
+                        : MobileBody(
+                            cart: _cart,
+                            goldPriceEgp: _currentGoldPricePiasters / 100.0,
+                            isPendingApproval: _isPendingApproval,
+                            invoiceError: _invoiceError,
+                            onRefreshPrices: _refreshPrices,
+                            onOpenScanner: _openScanner,
+                            onOpenManualCode: _openManualCode,
+                            onShowCalculation: _showCalculation,
+                            onEditDiscount: _openDiscountSheet,
+                            onRemove: _removeItem,
+                            onAddTradeIn: _openTradeInSheet,
+                            onCancelPending: _cancelPendingDiscount,
+                            onPay: _openPaymentScreen,
+                          ),
+                  ),
+          );
+        },
+      ),
     );
   }
 }

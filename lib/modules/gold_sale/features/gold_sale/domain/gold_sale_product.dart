@@ -23,4 +23,18 @@ class GoldSaleProduct {
   final int defaultLaborValue;
   final LaborPricingType defaultLaborType;
   final int defaultDiscountPercent;
+
+  GoldSaleProduct copyWith({GoldItemStatus? status}) {
+    return GoldSaleProduct(
+      code: code,
+      status: status ?? this.status,
+      grossWeightMg: grossWeightMg,
+      stonesWeightMg: stonesWeightMg,
+      karat: karat,
+      name: name,
+      defaultLaborValue: defaultLaborValue,
+      defaultLaborType: defaultLaborType,
+      defaultDiscountPercent: defaultDiscountPercent,
+    );
+  }
 }

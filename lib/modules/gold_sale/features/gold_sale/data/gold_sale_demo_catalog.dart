@@ -3,7 +3,8 @@ import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_s
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_product.dart';
 
 class GoldSaleDemoCatalog {
-  const GoldSaleDemoCatalog();
+  GoldSaleDemoCatalog();
+  final Set<String> _soldCodes = <String>{};
 
   static const Map<String, GoldSaleProduct> _records = {
     'DEMO-1001': GoldSaleProduct(
@@ -68,7 +69,7 @@ class GoldSaleDemoCatalog {
       grossWeightMg: 4500,
       stonesWeightMg: 300,
       karat: 21,
-      defaultLaborValue: 12000, 
+      defaultLaborValue: 12000,
       defaultLaborType: LaborPricingType.perGram,
       defaultDiscountPercent: 10,
     ),
@@ -103,8 +104,26 @@ class GoldSaleDemoCatalog {
     ),
   };
 
-  List<GoldSaleProduct> get demoItems => List.unmodifiable(_records.values);
+  void markSold(String code) {
+    _soldCodes.add(code.trim().toUpperCase());
+  }
 
-  GoldSaleProduct? findByCode(String code) =>
-      _records[code.trim().toUpperCase()];
+  bool isSold(String code) => _soldCodes.contains(code.trim().toUpperCase());
+
+  List<GoldSaleProduct> get demoItems => List.unmodifiable(
+    _records.values.map(
+      (product) => isSold(product.code)
+          ? product.copyWith(status: GoldItemStatus.sold)
+          : product,
+    ),
+  );
+
+  GoldSaleProduct? findByCode(String code) {
+    final normalized = code.trim().toUpperCase();
+    final product = _records[normalized];
+    if (product == null) return null;
+    return isSold(normalized)
+        ? product.copyWith(status: GoldItemStatus.sold)
+        : product;
+  }
 }

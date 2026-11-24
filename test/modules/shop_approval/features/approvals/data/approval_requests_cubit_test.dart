@@ -25,6 +25,17 @@ class _NotFoundApi implements ApprovalApi {
   ) async {
     throw ApprovalRequestNotFoundException(command.requestId);
   }
+
+    @override
+  Future<ApprovalRequest> createRequest({
+    required String employeeName,
+    required String branchName,
+    required int amountInPiastres,
+    required String reason,
+    String? attentionMessage,
+  }) async {
+    throw UnimplementedError();
+  }
 }
 
 class _ScriptedApi implements ApprovalApi {
@@ -45,6 +56,17 @@ class _ScriptedApi implements ApprovalApi {
   Future<ApprovalDecisionResult> submitDecision(
     ApprovalDecisionCommand command,
   ) async {
+    throw UnimplementedError();
+  }
+
+    @override
+  Future<ApprovalRequest> createRequest({
+    required String employeeName,
+    required String branchName,
+    required int amountInPiastres,
+    required String reason,
+    String? attentionMessage,
+  }) async {
     throw UnimplementedError();
   }
 }

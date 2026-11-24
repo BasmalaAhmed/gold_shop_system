@@ -496,4 +496,41 @@ class ApprovalRequestsCubit extends Cubit<ApprovalRequestsState> {
       DecisionConflict(attemptedCommand: command, latestRequest: latest),
     );
   }
+
+  Future<ApprovalRequest?> submitDiscountApprovalRequest({
+    required String employeeName,
+    required String branchName,
+    required int amountInPiastres,
+    required String reason,
+    String? attentionMessage,
+  }) async {
+    try {
+      final created = await api.createRequest(
+        employeeName: employeeName,
+        branchName: branchName,
+        amountInPiastres: amountInPiastres,
+        reason: reason,
+        attentionMessage: attentionMessage,
+      );
+      final currentState = state;
+      if (currentState is ApprovalRequestsSuccess) {
+        final updated = [
+          created,
+          ...currentState.requests.where(
+            (r) => r.requestId != created.requestId,
+          ),
+        ];
+        emit(
+          currentState.copyWith(
+            requests: List<ApprovalRequest>.unmodifiable(updated),
+          ),
+        );
+      } else {
+        await loadRequests();
+      }
+      return created;
+    } catch (_) {
+      return null;
+    }
+  }
 }
