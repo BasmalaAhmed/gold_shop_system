@@ -61,20 +61,24 @@ class _UnifiedAuthGateState extends State<UnifiedAuthGate> {
         }
 
         if (currentState is AuthAuthenticated) {
-          return BlocBuilder<ApprovalCubit, ApprovalState>(
-            builder: (context, approvalState) {
-              if (approvalState is ApprovalLoading ||
-                  approvalState is ApprovalLoaded) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
-
-              return UnifiedMainShell(
+          return Stack(
+            children: [
+              UnifiedMainShell(
                 dependencies: widget.dependencies,
                 onDeepLink: widget.onDeepLink,
-              );
-            },
+              ),
+              BlocBuilder<ApprovalCubit, ApprovalState>(
+                builder: (context, approvalState) {
+                  if (approvalState is ApprovalLoading) {
+                    return const ColoredBox(
+                      color: Colors.black26,
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+            ],
           );
         }
 

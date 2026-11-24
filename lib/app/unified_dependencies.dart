@@ -82,4 +82,10 @@ class UnifiedDependencies {
       goldPriceRepo: goldPriceRepo,
     );
   }
+
+  Future<void> dispose() async {
+    await debtsConnectivityObserver.dispose();
+    await debtsDatabase.close();
+    await monitoring_locator.disposeDependencies();
+  }
 }

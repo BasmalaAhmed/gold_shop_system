@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -8,32 +10,43 @@ import 'package:gold_shop_app/modules/auth_notification/features/notifications/p
 import 'package:gold_shop_app/modules/shop_approval/core/connectivity/connectivity_cubit.dart';
 import 'package:gold_shop_app/modules/shop_approval/features/approvals/presentation/manager/approval_requests_cubit/approval_requests_cubit.dart';
 
-class UnifiedGoldShopApp extends StatelessWidget {
+class UnifiedGoldShopApp extends StatefulWidget {
   final UnifiedDependencies dependencies;
 
-  const UnifiedGoldShopApp({
-    super.key,
-    required this.dependencies,
-  });
+  const UnifiedGoldShopApp({super.key, required this.dependencies});
+
+  @override
+  State<UnifiedGoldShopApp> createState() => _UnifiedGoldShopAppState();
+}
+
+class _UnifiedGoldShopAppState extends State<UnifiedGoldShopApp> {
+  @override
+  void dispose() {
+    unawaited(widget.dependencies.dispose());
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (_) => dependencies.authDependencies.createAuthCubit()
-            ..restoreSession(),
+          create: (_) =>
+              widget.dependencies.authDependencies.createAuthCubit()
+                ..restoreSession(),
         ),
         BlocProvider(
-          create: (_) => dependencies.authDependencies.createApprovalCubit(),
+          create: (_) =>
+              widget.dependencies.authDependencies.createApprovalCubit(),
         ),
         BlocProvider(
-          create: (_) => ConnectivityCubit(dependencies.approvalConnectivity),
+          create: (_) =>
+              ConnectivityCubit(widget.dependencies.approvalConnectivity),
         ),
         BlocProvider(
           create: (_) => ApprovalRequestsCubit(
-            dependencies.approvalApi,
-            isOnline: () => dependencies.approvalConnectivity.isOnline,
+            widget.dependencies.approvalApi,
+            isOnline: () => widget.dependencies.approvalConnectivity.isOnline,
           )..loadRequests(),
         ),
       ],
@@ -45,15 +58,15 @@ class UnifiedGoldShopApp extends StatelessWidget {
         supportedLocales: const [Locale('ar')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
         home: ApprovalRequestCoordinatorHost(
-          appLinks: dependencies.appLinks,
+          appLinks: widget.dependencies.appLinks,
           pendingApprovalManager:
-              dependencies.authDependencies.pendingApprovalManager,
+              widget.dependencies.authDependencies.pendingApprovalManager,
           builder: (context, coordinator) {
             return UnifiedAuthGate(
               sessionManager:
-                  dependencies.authDependencies.sessionManager,
+                  widget.dependencies.authDependencies.sessionManager,
               onDeepLink: coordinator.handleLink,
-              dependencies: dependencies,
+              dependencies: widget.dependencies,
             );
           },
         ),

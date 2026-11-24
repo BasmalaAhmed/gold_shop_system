@@ -62,7 +62,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     _syncSubscription.cancel();
     _summary.dispose();
     unawaited(_syncOnReconnect.dispose());
-    unawaited(widget.connectivityObserver.dispose());
     super.dispose();
   }
 

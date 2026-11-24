@@ -15,7 +15,12 @@ class DeviceConnectivityObserver with WidgetsBindingObserver {
 
   StreamSubscription<List<ConnectivityResult>>? _subscription;
 
+  bool _started = false;
+
   Future<void> start() async {
+    if (_started) return;
+    _started = true;
+
     WidgetsBinding.instance.addObserver(this);
 
     _subscription = _connectivity.onConnectivityChanged.listen(
@@ -25,6 +30,15 @@ class DeviceConnectivityObserver with WidgetsBindingObserver {
 
     await _refresh();
   }
+
+  Future<void> dispose() async {
+    if (!_started) return;
+    _started = false;
+    WidgetsBinding.instance.removeObserver(this);
+    await _subscription?.cancel();
+    _subscription = null;
+  }
+
 
   void _updateNetwork(List<ConnectivityResult> results) {
     final hasNetwork = results.any(
@@ -52,10 +66,5 @@ class DeviceConnectivityObserver with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refresh());
     }
-  }
-
-  Future<void> dispose() async {
-    WidgetsBinding.instance.removeObserver(this);
-    await _subscription?.cancel();
   }
 }
