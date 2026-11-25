@@ -9,6 +9,7 @@ import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/data/gold_sal
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_item_status.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_calc.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_cart.dart';
+import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_failure.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_payment.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_payment_method.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_price_repo.dart';
@@ -41,20 +42,20 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> {
   int? _pendingApprovalRequestId;
+  bool _isAddingItem = false;
   final _catalog = GoldSaleDemoCatalog();
   final _cart = GoldSaleCart();
   final _draftRepository = GoldSaleDraftRepo();
   final _recordRepository = GoldSaleRecordRepo();
   final _paymentValidator = const GoldSalePaymentValidator();
   DateTime? _lastSavedAt;
-
+  bool _isSendingApprovalRequest = false;
   bool _isLoadingDraft = true;
   Future<void> _saveQueue = Future<void>.value();
-
   String _cashAmountText = '';
   String _otherAmountText = '';
   GoldSalePaymentMethod _otherPaymentMethod = GoldSalePaymentMethod.other;
-
+  bool _isCompletingSale = false;
   InvoiceError? _invoiceError;
   bool _isPendingApproval = false;
   bool _isTabletPaymentMode = false;
@@ -105,7 +106,7 @@ class _HomeViewState extends State<HomeView> {
           _otherAmountText = draft.otherAmountText;
           _otherPaymentMethod = draft.otherMethod;
           _pendingApprovalRequestId = isPending ? pendingId : null;
-          _isPendingApproval = draft.discountPercent > 10;
+          _isPendingApproval = isPending;
           _lastSavedAt = draft.savedAt;
         });
       }
@@ -149,6 +150,16 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Future<void> _addByCode(String code) async {
+    if (_isAddingItem) return;
+    _isAddingItem = true;
+    try {
+      await _addByCodeInternal(code);
+    } finally {
+      _isAddingItem = false;
+    }
+  }
+
+  Future<void> _addByCodeInternal(String code) async {
     if (!mounted) return;
     setState(() => _invoiceError = null);
 
@@ -215,19 +226,24 @@ class _HomeViewState extends State<HomeView> {
       laborPricingType: laborType,
     );
 
-    setState(() {
-      _cart.add(
-        GoldSaleCartItem(
-          code: product.code,
-          name: product.name,
-          status: product.status,
-          input: input,
-        ),
-      );
-      if (_cart.discountPercent == 0 && product.defaultDiscountPercent > 0) {
-        _cart.setDiscount(discountPercent: product.defaultDiscountPercent);
-      }
-    });
+    try {
+      setState(() {
+        _cart.add(
+          GoldSaleCartItem(
+            code: product.code,
+            name: product.name,
+            status: product.status,
+            input: input,
+          ),
+        );
+        if (_cart.discountPercent == 0 && product.defaultDiscountPercent > 0) {
+          _cart.setDiscount(discountPercent: product.defaultDiscountPercent);
+        }
+      });
+    } catch (_) {
+      _showMessage('تعذر إضافة القطعة إلى الفاتورة.');
+      return;
+    }
     _saveDraft();
   }
 
@@ -253,56 +269,71 @@ class _HomeViewState extends State<HomeView> {
       final sale = await widget.priceRepository.getSalePricePerGramPiasters(21);
       final buy = await widget.priceRepository.getBuyPricePerGramPiasters(21);
       if (!mounted) return;
-      _currentGoldPricePiasters = sale;
-      _currentBuyPricePiasters = buy;
-      if (_cart.items.isNotEmpty) {
-        final refreshed = <GoldSaleCartItem>[];
-        for (final item in _cart.items) {
-          final old = item.input;
-          final price = await widget.priceRepository
-              .getSalePricePerGramPiasters(old.karat);
-          refreshed.add(
-            GoldSaleCartItem(
-              code: item.code,
-              name: item.name,
-              status: item.status,
-              input: GoldSaleInput(
-                grossWeightMg: old.grossWeightMg,
-                stonesWeightMg: old.stonesWeightMg,
-                karat: old.karat,
-                goldPricePerGramPiasters: price,
-                laborValue: old.laborValue,
-                laborPricingType: old.laborPricingType,
-              ),
-            ),
-          );
-        }
 
-        TradeInInput? refreshedTradeIn;
-        final trade = _cart.tradeIn;
-        if (trade != null) {
-          refreshedTradeIn = TradeInInput(
-            weightMg: trade.weightMg,
-            karat: trade.karat,
-            buyPricePerGramPiasters: await widget.priceRepository
-                .getBuyPricePerGramPiasters(trade.karat),
-            deductionBasisPoints: trade.deductionBasisPoints,
-          );
-        }
-
-        if (mounted) {
-          setState(() {
-            _cart.restore(
-              items: refreshed,
-              discountPercent: _cart.discountPercent,
-              supervisorApprovalNumber: _cart.supervisorApprovalNumber,
-              tradeIn: refreshedTradeIn,
-            );
-          });
-        }
-      } else {
-        if (mounted) setState(() {});
+      if (_cart.items.isEmpty) {
+        setState(() {
+          _currentGoldPricePiasters = sale;
+          _currentBuyPricePiasters = buy;
+        });
+        _showMessage('تم تحديث الأسعار.');
+        return;
       }
+
+      final refreshed = <GoldSaleCartItem>[];
+      for (final item in _cart.items) {
+        final old = item.input;
+        final price = await widget.priceRepository.getSalePricePerGramPiasters(
+          old.karat,
+        );
+        refreshed.add(
+          GoldSaleCartItem(
+            code: item.code,
+            name: item.name,
+            status: item.status,
+            input: GoldSaleInput(
+              grossWeightMg: old.grossWeightMg,
+              stonesWeightMg: old.stonesWeightMg,
+              karat: old.karat,
+              goldPricePerGramPiasters: price,
+              laborValue: old.laborValue,
+              laborPricingType: old.laborPricingType,
+            ),
+          ),
+        );
+      }
+
+      TradeInInput? refreshedTradeIn;
+      final trade = _cart.tradeIn;
+      if (trade != null) {
+        refreshedTradeIn = TradeInInput(
+          weightMg: trade.weightMg,
+          karat: trade.karat,
+          buyPricePerGramPiasters: await widget.priceRepository
+              .getBuyPricePerGramPiasters(trade.karat),
+          deductionBasisPoints: trade.deductionBasisPoints,
+        );
+      }
+
+      if (!mounted) return;
+
+      try {
+        setState(() {
+          _cart.restore(
+            items: refreshed,
+            discountPercent: _cart.discountPercent,
+            supervisorApprovalNumber: _cart.supervisorApprovalNumber,
+            tradeIn: refreshedTradeIn,
+          );
+          _currentGoldPricePiasters = sale;
+          _currentBuyPricePiasters = buy;
+        });
+      } catch (_) {
+        _showMessage(
+          'تعذر تحديث الأسعار لأن قيمة البدل ستتجاوز إجمالي الفاتورة.',
+        );
+        return;
+      }
+
       _saveDraft();
       _showMessage('تم تحديث الأسعار.');
     } catch (_) {
@@ -350,23 +381,30 @@ class _HomeViewState extends State<HomeView> {
     if (percent <= 10) {
       try {
         _cart.setDiscount(discountPercent: percent);
-        setState(() {
-          _isPendingApproval = false;
-          _pendingApprovalRequestId = null;
-        });
-        _saveDraft();
       } catch (_) {
-        _showMessage('الخصم غير صالح.');
+        _showMessage('الخصم غير صالح أو يجعل المطلوب أقل من قيمة البدل.');
+        return;
       }
+      setState(() {
+        _isPendingApproval = false;
+        _pendingApprovalRequestId = null;
+      });
+      _saveDraft();
       return;
     }
+
+    if (_isSendingApprovalRequest) return;
+
+    final previousPercent = _cart.discountPercent;
+    final previousApproval = _cart.supervisorApprovalNumber;
+
     try {
       _cart.setDiscount(
         discountPercent: percent,
         supervisorApprovalNumber: 'Pending',
       );
     } catch (_) {
-      _showMessage('الخصم غير صالح');
+      _showMessage('الخصم غير صالح أو يجعل المطلوب أقل من قيمة البدل.');
       return;
     }
 
@@ -377,26 +415,44 @@ class _HomeViewState extends State<HomeView> {
       0,
       (sum, r) => sum + r.discountPiasters,
     );
-    final created = await context
-        .read<ApprovalRequestsCubit>()
-        .submitDiscountApprovalRequest(
-          employeeName: 'كاشير المبيعات',
-          branchName: 'فرع المهندسين',
-          amountInPiastres: discountAmount,
-          reason: 'طلب خصم $percent% على $itemsLabel',
-        );
+
+    setState(() => _isSendingApprovalRequest = true);
+
+    ApprovalRequest? created;
+    try {
+      created = await context
+          .read<ApprovalRequestsCubit>()
+          .submitDiscountApprovalRequest(
+            employeeName: 'كاشير المبيعات',
+            branchName: 'فرع المهندسين',
+            amountInPiastres: discountAmount,
+            reason: 'طلب خصم $percent% على $itemsLabel',
+          );
+    } finally {
+      if (mounted) setState(() => _isSendingApprovalRequest = false);
+    }
+
     if (!mounted) return;
+
     if (created == null) {
-      _cart.setDiscount(discountPercent: 10);
+      setState(() {
+        _cart.setDiscount(
+          discountPercent: previousPercent,
+          supervisorApprovalNumber: previousApproval,
+        );
+      });
       _showMessage('تعذر إرسال طلب الموافقة.');
       return;
     }
+
+    final requestId = created.requestId;
+
     setState(() {
-      _pendingApprovalRequestId = created.requestId;
+      _pendingApprovalRequestId = requestId;
       _isPendingApproval = true;
       _cart.setDiscount(
         discountPercent: percent,
-        supervisorApprovalNumber: 'REQ-${created.requestId}',
+        supervisorApprovalNumber: 'REQ-$requestId',
       );
     });
     _saveDraft();
@@ -426,6 +482,7 @@ class _HomeViewState extends State<HomeView> {
           _isTabletPaymentMode = false;
           _cashAmountText = '';
           _otherAmountText = '';
+          _pendingApprovalRequestId = null;
         });
         await _draftRepository.clear();
 
@@ -457,41 +514,61 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Future<void> _completeSale(List<GoldSalePayment> payments) async {
-    _paymentValidator.validate(
+    if (_isCompletingSale) {
+      throw const GoldSaleFailure('جاري تسجيل الفاتورة، انتظر لحظة.');
+    }
+    if (_isPendingApproval) {
+      throw const GoldSaleFailure('الخصم بانتظار موافقة صاحب المحل.');
+    }
+    if (_cart.items.isEmpty) {
+      throw const GoldSaleFailure('الفاتورة فارغة.');
+    }
+
+    final paymentError = _paymentValidator.errorMessage(
       amountDuePiasters: _cart.amountDuePiasters,
       payments: payments,
     );
+    if (paymentError != null) throw GoldSaleFailure(paymentError);
 
     for (final item in _cart.items) {
       final current = _catalog.findByCode(item.code);
       if (current == null || current.status != GoldItemStatus.available) {
-        _showMessage('القطعة ${item.code} لم تعد متاحة للبيع.');
-        throw StateError('Item unavailable');
+        throw GoldSaleFailure('القطعة ${item.code} لم تعد متاحة للبيع.');
       }
     }
 
-    final record = GoldSaleRecord.fromCart(
-      cart: _cart,
-      payments: payments,
-      recordedAt: DateTime.now(),
-    );
+    _isCompletingSale = true;
+    try {
+      final record = GoldSaleRecord.fromCart(
+        cart: _cart,
+        payments: payments,
+        recordedAt: DateTime.now(),
+      );
 
-    await _saveQueue;
-    await _recordRepository.add(record);
-    await _draftRepository.clear();
-    for (final item in _cart.items) {
-      _catalog.markSold(item.code);
-    }
-    if (mounted) {
-      setState(() {
-        _cart.clear();
-        _invoiceError = null;
-        _isPendingApproval = false;
-        _pendingApprovalRequestId = null;
-        _isTabletPaymentMode = false;
-        _cashAmountText = '';
-        _otherAmountText = '';
-      });
+      try {
+        await _saveQueue;
+      } catch (_) {}
+
+      await _recordRepository.add(record);
+      await _draftRepository.clear();
+
+      for (final item in _cart.items) {
+        _catalog.markSold(item.code);
+      }
+
+      if (mounted) {
+        setState(() {
+          _cart.clear();
+          _invoiceError = null;
+          _isPendingApproval = false;
+          _pendingApprovalRequestId = null;
+          _isTabletPaymentMode = false;
+          _cashAmountText = '';
+          _otherAmountText = '';
+        });
+      }
+    } finally {
+      _isCompletingSale = false;
     }
   }
 
@@ -523,7 +600,7 @@ class _HomeViewState extends State<HomeView> {
           amountDuePiasters: amountDue,
           cashPaidPiasters: cashPaid,
           secondaryPaidPiasters: secPayment.amountPiasters,
-          secondaryMethodName: 'إنستاباي',
+          secondaryMethodName: secPayment.method.arabicLabel,
           goldPricePiasters: _currentGoldPricePiasters,
           onNewInvoice: () {
             if (mounted) {
@@ -532,6 +609,7 @@ class _HomeViewState extends State<HomeView> {
                 _isTabletPaymentMode = false;
                 _invoiceError = null;
                 _isPendingApproval = false;
+                _pendingApprovalRequestId = null;
               });
             }
           },
@@ -568,6 +646,7 @@ class _HomeViewState extends State<HomeView> {
               _cart.clear();
               _invoiceError = null;
               _isPendingApproval = false;
+              _pendingApprovalRequestId = null;
             });
           },
         ),
@@ -578,9 +657,9 @@ class _HomeViewState extends State<HomeView> {
   void _cancelPendingDiscount() {
     setState(() {
       _isPendingApproval = false;
+      _pendingApprovalRequestId = null;
       _cart.setDiscount(discountPercent: 10);
     });
-
     _saveDraft();
   }
 
@@ -588,11 +667,19 @@ class _HomeViewState extends State<HomeView> {
   Widget build(BuildContext context) {
     return BlocListener<ApprovalRequestsCubit, ApprovalRequestsState>(
       listener: (context, state) {
-        final success = state as ApprovalRequestsSuccess;
-        final req = success.requests
-            .where((r) => r.requestId == _pendingApprovalRequestId)
+        final requestId = _pendingApprovalRequestId;
+        if (requestId == null || state is! ApprovalRequestsSuccess) return;
+
+        final req = state.requests
+            .where((r) => r.requestId == requestId)
             .firstOrNull;
-        if (req == null) return;
+
+        if (req == null) {
+          _cancelPendingDiscount();
+          _showMessage('طلب الموافقة لم يعد موجودًا، تم الرجوع إلى 10%.');
+          return;
+        }
+
         if (req.status == ApprovalStatus.approved) {
           setState(() {
             _isPendingApproval = false;
@@ -611,7 +698,6 @@ class _HomeViewState extends State<HomeView> {
           }
         } else if (req.status == ApprovalStatus.rejected) {
           _cancelPendingDiscount();
-          _pendingApprovalRequestId = null;
           _showMessage('تم رفض طلب الخصم، تم الرجوع إلى 10%.');
         }
       },

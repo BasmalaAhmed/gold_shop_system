@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gold_shop_app/modules/gold_sale/core/theme/app_theme.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_cart.dart';
+import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_failure.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_payment.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_payment_method.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/home/presentation/widgets/tablet/summary_row.dart';
@@ -30,7 +31,7 @@ class TabletSummaryPanel extends StatefulWidget {
 }
 
 class _TabletSummaryPanelState extends State<TabletSummaryPanel> {
-  late TextEditingController _cashController;
+  final TextEditingController _cashController = TextEditingController();
   int _cashPaidPiasters = 0;
   GoldSalePaymentMethod _secondaryMethod = GoldSalePaymentMethod.other;
 
@@ -56,12 +57,10 @@ class _TabletSummaryPanelState extends State<TabletSummaryPanel> {
   }
 
   void _resetPaymentState() {
-    final due = widget.cart.amountDuePiasters;
-    _cashPaidPiasters = due > 500000 ? 500000 : due;
-    _cashController = TextEditingController(
-      text: (_cashPaidPiasters / 100.0).toStringAsFixed(2),
-    );
-  }
+  final due = widget.cart.amountDuePiasters;
+  _cashPaidPiasters = due > 500000 ? 500000 : due;
+  _cashController.text = (_cashPaidPiasters / 100.0).toStringAsFixed(2);
+}
 
   @override
   void dispose() {
@@ -77,35 +76,53 @@ class _TabletSummaryPanelState extends State<TabletSummaryPanel> {
 
   bool _isSubmitting = false;
 
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _submitPayment() async {
     if (_isSubmitting) return;
-    setState(() => _isSubmitting = true);
+
     final payments = <GoldSalePayment>[];
+    if (_cashPaidPiasters > 0) {
+      payments.add(
+        GoldSalePayment(
+          method: GoldSalePaymentMethod.cash,
+          amountPiasters: _cashPaidPiasters,
+        ),
+      );
+    }
+    if (_remainingPiasters > 0) {
+      payments.add(
+        GoldSalePayment(
+          method: _secondaryMethod,
+          amountPiasters: _remainingPiasters,
+        ),
+      );
+    }
+
+    final validationError = const GoldSalePaymentValidator().errorMessage(
+      amountDuePiasters: widget.cart.amountDuePiasters,
+      payments: payments,
+    );
+    if (validationError != null) {
+      _showError(validationError);
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
 
     try {
-      if (_cashPaidPiasters > 0) {
-        payments.add(
-          GoldSalePayment(
-            method: GoldSalePaymentMethod.cash,
-            amountPiasters: _cashPaidPiasters,
-          ),
-        );
-      }
-      if (_remainingPiasters > 0) {
-        payments.add(
-          GoldSalePayment(
-            method: _secondaryMethod,
-            amountPiasters: _remainingPiasters,
-          ),
-        );
-      }
       await widget.onConfirmPayment(payments);
+    } on GoldSaleFailure catch (failure) {
+      _showError(failure.message);
+    } catch (_) {
+      _showError('تعذر تسجيل الفاتورة. حاول مرة أخرى.');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-      }
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -380,11 +397,11 @@ class _TabletSummaryPanelState extends State<TabletSummaryPanel> {
               color: const Color(0xFFF0FDF4),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '0.00 ج.م',
+                  '$remainingEgp ج.م',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,

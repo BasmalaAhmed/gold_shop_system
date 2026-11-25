@@ -33,6 +33,7 @@ class GoldSaleDraft {
 
       return {
         'code': item.code,
+        'name': item.name,
         'status': item.status.name,
         'input': {
           'grossWeightMg': input.grossWeightMg,
@@ -70,6 +71,7 @@ class GoldSaleDraft {
 
       return GoldSaleCartItem(
         code: itemJson['code'] as String,
+        name: itemJson['name'] as String? ?? 'قطعة ذهب',
         status: GoldItemStatus.values.byName(itemJson['status'] as String),
         input: GoldSaleInput(
           grossWeightMg: inputJson['grossWeightMg'] as int,

@@ -35,4 +35,25 @@ class GoldSalePaymentValidator {
       throw ArgumentError('Payment total must exactly match the amount due.');
     }
   }
+
+  String? errorMessage({
+    required int amountDuePiasters,
+    required List<GoldSalePayment> payments,
+  }) {
+    if (amountDuePiasters <= 0) {
+      return 'المبلغ المطلوب يجب أن يكون أكبر من صفر. راجع الخصم أو البدل.';
+    }
+    if (payments.isEmpty) return 'أدخل مبلغ الدفع.';
+    if (payments.any((p) => p.amountPiasters <= 0)) {
+      return 'مبالغ الدفع يجب أن تكون أكبر من صفر.';
+    }
+
+    final paid = payments.fold<int>(0, (sum, p) => sum + p.amountPiasters);
+
+    if (paid > amountDuePiasters) return 'المبلغ المدفوع أكبر من المطلوب.';
+    if (paid != amountDuePiasters) {
+      return 'مجموع المدفوعات يجب أن يساوي المطلوب بالضبط.';
+    }
+    return null;
+  }
 }

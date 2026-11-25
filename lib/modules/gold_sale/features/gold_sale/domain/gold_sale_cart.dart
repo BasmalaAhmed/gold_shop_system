@@ -111,7 +111,7 @@ class GoldSaleCart {
   int _discountPercent = 0;
   String? _supervisorApprovalNumber;
 
-  void setDiscount({
+  void checkDiscount({
     required int discountPercent,
     String? supervisorApprovalNumber,
   }) {
@@ -122,13 +122,34 @@ class GoldSaleCart {
       supervisorApprovalNumber: approvalNumber,
     );
 
+    var newTotalPiasters = 0;
     for (final item in _items) {
-      _calculator.calculate(
-        item.input,
-        discountPercent: discountPercent,
-        supervisorApprovalNumber: approvalNumber,
+      newTotalPiasters += _calculator
+          .calculate(
+            item.input,
+            discountPercent: discountPercent,
+            supervisorApprovalNumber: approvalNumber,
+          )
+          .totalPiasters;
+    }
+
+    if (_tradeIn != null && tradeInValuePiasters >= newTotalPiasters) {
+      throw ArgumentError(
+        'Discount makes the total less than or equal to the trade-in value.',
       );
     }
+  }
+
+  void setDiscount({
+    required int discountPercent,
+    String? supervisorApprovalNumber,
+  }) {
+    final approvalNumber = supervisorApprovalNumber?.trim();
+
+    checkDiscount(
+      discountPercent: discountPercent,
+      supervisorApprovalNumber: approvalNumber,
+    );
 
     _supervisorApprovalNumber = approvalNumber == null || approvalNumber.isEmpty
         ? null

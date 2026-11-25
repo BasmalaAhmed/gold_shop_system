@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gold_shop_app/core/unified_theme.dart';
 import 'package:gold_shop_app/modules/gold_sale/core/utils/price_formatter.dart';
+import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_failure.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_payment.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_payment_method.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/home/presentation/widgets/sale_success_screen.dart';
@@ -58,52 +59,69 @@ class _SalePaymentViewState extends State<SalePaymentView> {
 
   bool _isSubmitting = false;
 
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _submit() async {
     if (_isSubmitting) return;
-    setState(() => _isSubmitting = true);
-    final payments = <GoldSalePayment>[];
-    try {
-      if (_cashPaidPiasters > 0) {
-        payments.add(
-          GoldSalePayment(
-            method: GoldSalePaymentMethod.cash,
-            amountPiasters: _cashPaidPiasters,
-          ),
-        );
-      }
-      if (_remainingPiasters > 0) {
-        payments.add(
-          GoldSalePayment(
-            method: _secondaryMethod,
-            amountPiasters: _remainingPiasters,
-          ),
-        );
-      }
 
-      try {
-        await widget.onCompleteSale(payments);
-        if (!mounted) return;
-        await Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => SaleSuccessScreen(
-              amountDuePiasters: widget.amountDuePiasters,
-              cashPaidPiasters: _cashPaidPiasters,
-              secondaryPaidPiasters: _remainingPiasters,
-              secondaryMethodName:
-                  _methodLabels[_secondaryMethod] ?? 'إنستاباي',
-              goldPricePiasters: widget.currentGoldPricePiasters,
-              onNewInvoice: widget.onNewInvoice,
-            ),
-          ),
-        );
-      } catch (_) {}
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-      }
+    final payments = <GoldSalePayment>[];
+    if (_cashPaidPiasters > 0) {
+      payments.add(
+        GoldSalePayment(
+          method: GoldSalePaymentMethod.cash,
+          amountPiasters: _cashPaidPiasters,
+        ),
+      );
     }
+    if (_remainingPiasters > 0) {
+      payments.add(
+        GoldSalePayment(
+          method: _secondaryMethod,
+          amountPiasters: _remainingPiasters,
+        ),
+      );
+    }
+
+    final validationError = const GoldSalePaymentValidator().errorMessage(
+      amountDuePiasters: widget.amountDuePiasters,
+      payments: payments,
+    );
+    if (validationError != null) {
+      _showError(validationError);
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      await widget.onCompleteSale(payments);
+      if (!mounted) return;
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => SaleSuccessScreen(
+            amountDuePiasters: widget.amountDuePiasters,
+            cashPaidPiasters: _cashPaidPiasters,
+            secondaryPaidPiasters: _remainingPiasters,
+            secondaryMethodName: _methodLabels[_secondaryMethod] ?? 'إنستاباي',
+            goldPricePiasters: widget.currentGoldPricePiasters,
+            onNewInvoice: widget.onNewInvoice,
+          ),
+        ),
+      );
+      return;
+    } on GoldSaleFailure catch (failure) {
+      _showError(failure.message);
+    } catch (_) {
+      _showError('تعذر تسجيل الفاتورة. حاول مرة أخرى.');
+    }
+
+    if (mounted) setState(() => _isSubmitting = false);
   }
 
   @override
