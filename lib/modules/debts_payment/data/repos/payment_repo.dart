@@ -38,6 +38,31 @@ class PaymentRepo {
     );
   }
 
+  Future<bool> refreshDebtsIfIdle(
+    String customerId,
+    List<Map<String, Object?>> serverDebts,
+  ) async {
+    final db = await _database.database;
+
+    return db.transaction((txn) async {
+      final rows = await txn.rawQuery(
+        '''
+      SELECT COUNT(*) AS total
+      FROM sync_queue q
+      JOIN payments p ON p.id = q.payment_id
+      WHERE p.customer_id = ?
+        AND q.status NOT IN ('confirmed', 'cancelled', 'superseded')
+      ''',
+        [customerId],
+      );
+
+      if ((rows.single['total'] as int) > 0) return false;
+
+      await _refreshDebtCache(txn, customerId, serverDebts);
+      return true;
+    });
+  }
+
   Future<String> _recordPaymentInTxn(
     Transaction txn, {
     required String customerId,

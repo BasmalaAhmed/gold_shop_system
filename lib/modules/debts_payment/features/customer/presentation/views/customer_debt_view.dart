@@ -55,8 +55,10 @@ class _CustomerDebtViewState extends State<CustomerDebtView> {
       _loadDebts(showLoading: false);
     });
 
-    _networkSubscription = widget.network.changes.listen((_) {
-      if (mounted) setState(() {});
+    _networkSubscription = widget.network.changes.listen((isOnline) {
+      if (!mounted) return;
+      setState(() {});
+      if (isOnline) _loadDebts(showLoading: false);
     });
 
     _loadDebts();
@@ -84,6 +86,17 @@ class _CustomerDebtViewState extends State<CustomerDebtView> {
         final serverDebts = await widget.api.fetchDebts(widget.customerId);
         await widget.repository.cacheDebts(widget.customerId, serverDebts);
         debts = await widget.repository.getDebtBalances(widget.customerId);
+      } else if (widget.network.isOnline) {
+        try {
+          final serverDebts = await widget.api.fetchDebts(widget.customerId);
+          final refreshed = await widget.repository.refreshDebtsIfIdle(
+            widget.customerId,
+            serverDebts,
+          );
+          if (refreshed) {
+            debts = await widget.repository.getDebtBalances(widget.customerId);
+          }
+        } catch (_) {}
       }
 
       final operations = await widget.repository.getSyncOperations();

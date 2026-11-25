@@ -533,4 +533,23 @@ class ApprovalRequestsCubit extends Cubit<ApprovalRequestsState> {
       return null;
     }
   }
+
+  Future<void> cancelDiscountApprovalRequest(int requestId) async {
+    try {
+      await api.cancelRequest(requestId);
+    } catch (_) {
+      return;
+    }
+
+    final currentState = state;
+    if (currentState is ApprovalRequestsSuccess) {
+      emit(
+        currentState.copyWith(
+          requests: currentState.requests
+              .where((r) => r.requestId != requestId)
+              .toList(growable: false),
+        ),
+      );
+    }
+  }
 }

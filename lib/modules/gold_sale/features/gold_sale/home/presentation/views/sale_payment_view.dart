@@ -289,6 +289,7 @@ class _SalePaymentViewState extends State<SalePaymentView> {
                                 setState(() => _secondaryMethod = entry.key),
                             child: Container(
                               margin: const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
                               height: 40,
                               decoration: BoxDecoration(
                                 color: isSelected

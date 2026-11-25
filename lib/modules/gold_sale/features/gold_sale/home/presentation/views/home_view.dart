@@ -66,7 +66,20 @@ class _HomeViewState extends State<HomeView> {
   void initState() {
     super.initState();
     _loadPrices();
+    _loadSoldCodes();
     _loadDraft();
+  }
+
+  Future<void> _loadSoldCodes() async {
+    try {
+      final records = await _recordRepository.loadAll();
+      for (final record in records) {
+        for (final item in (record['items'] as List<dynamic>? ?? const [])) {
+          _catalog.markSold((item as Map<String, dynamic>)['code'] as String);
+        }
+      }
+      if (mounted) setState(() {});
+    } catch (_) {}
   }
 
   Future<void> _loadPrices() async {
@@ -369,6 +382,26 @@ class _HomeViewState extends State<HomeView> {
     }
   }
 
+  void _revertToTenPercent() {
+    setState(() {
+      _isPendingApproval = false;
+      _pendingApprovalRequestId = null;
+      _cart.setDiscount(discountPercent: 10);
+    });
+    _saveDraft();
+  }
+
+  void _cancelPendingDiscount() {
+    final requestId = _pendingApprovalRequestId;
+    _revertToTenPercent();
+
+    if (requestId != null) {
+      context.read<ApprovalRequestsCubit>().cancelDiscountApprovalRequest(
+        requestId,
+      );
+    }
+  }
+
   void _openTradeInSheet() {
     ScrapGoldBottomSheet.show(
       context,
@@ -385,10 +418,16 @@ class _HomeViewState extends State<HomeView> {
         _showMessage('الخصم غير صالح أو يجعل المطلوب أقل من قيمة البدل.');
         return;
       }
+      final oldRequestId = _pendingApprovalRequestId;
       setState(() {
         _isPendingApproval = false;
         _pendingApprovalRequestId = null;
       });
+      if (oldRequestId != null) {
+        context.read<ApprovalRequestsCubit>().cancelDiscountApprovalRequest(
+          oldRequestId,
+        );
+      }
       _saveDraft();
       return;
     }
@@ -475,6 +514,7 @@ class _HomeViewState extends State<HomeView> {
           .toList(),
       onConfirm: () async {
         if (!mounted) return;
+        final oldRequestId = _pendingApprovalRequestId;
         setState(() {
           _cart.clear();
           _invoiceError = null;
@@ -484,6 +524,11 @@ class _HomeViewState extends State<HomeView> {
           _otherAmountText = '';
           _pendingApprovalRequestId = null;
         });
+        if (oldRequestId != null) {
+          context.read<ApprovalRequestsCubit>().cancelDiscountApprovalRequest(
+            oldRequestId,
+          );
+        }
         await _draftRepository.clear();
 
         if (mounted) {
@@ -654,15 +699,6 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  void _cancelPendingDiscount() {
-    setState(() {
-      _isPendingApproval = false;
-      _pendingApprovalRequestId = null;
-      _cart.setDiscount(discountPercent: 10);
-    });
-    _saveDraft();
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocListener<ApprovalRequestsCubit, ApprovalRequestsState>(
@@ -675,7 +711,7 @@ class _HomeViewState extends State<HomeView> {
             .firstOrNull;
 
         if (req == null) {
-          _cancelPendingDiscount();
+          _revertToTenPercent();
           _showMessage('طلب الموافقة لم يعد موجودًا، تم الرجوع إلى 10%.');
           return;
         }
@@ -697,7 +733,7 @@ class _HomeViewState extends State<HomeView> {
             _openPaymentScreen();
           }
         } else if (req.status == ApprovalStatus.rejected) {
-          _cancelPendingDiscount();
+          _revertToTenPercent();
           _showMessage('تم رفض طلب الخصم، تم الرجوع إلى 10%.');
         }
       },

@@ -26,7 +26,7 @@ class _NotFoundApi implements ApprovalApi {
     throw ApprovalRequestNotFoundException(command.requestId);
   }
 
-    @override
+  @override
   Future<ApprovalRequest> createRequest({
     required String employeeName,
     required String branchName,
@@ -34,6 +34,11 @@ class _NotFoundApi implements ApprovalApi {
     required String reason,
     String? attentionMessage,
   }) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> cancelRequest(int requestId) async {
     throw UnimplementedError();
   }
 }
@@ -59,7 +64,7 @@ class _ScriptedApi implements ApprovalApi {
     throw UnimplementedError();
   }
 
-    @override
+  @override
   Future<ApprovalRequest> createRequest({
     required String employeeName,
     required String branchName,
@@ -67,6 +72,11 @@ class _ScriptedApi implements ApprovalApi {
     required String reason,
     String? attentionMessage,
   }) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> cancelRequest(int requestId) async {
     throw UnimplementedError();
   }
 }
@@ -435,7 +445,7 @@ void main() {
     });
   });
 
-    group('lost responses and retries', () {
+  group('lost responses and retries', () {
     test('rejects a new decision while the outcome is unknown', () async {
       final api = MockApprovalApi(
         initialRequests: [buildRequest()],
@@ -487,89 +497,96 @@ void main() {
       expect(state.requests.single.version, 2);
     });
 
-    test('checking while offline stays unknown, then confirms once back online',
-        () async {
-      final api = MockApprovalApi(
-        initialRequests: [buildRequest()],
-        scenario: MockApiScenario.loseResponseAfterExecution,
-        responseDelay: Duration.zero,
-        now: () => fixedNow,
-      );
-      var online = true;
-      final cubit = ApprovalRequestsCubit(api, isOnline: () => online);
-      addTearDown(cubit.close);
+    test(
+      'checking while offline stays unknown, then confirms once back online',
+      () async {
+        final api = MockApprovalApi(
+          initialRequests: [buildRequest()],
+          scenario: MockApiScenario.loseResponseAfterExecution,
+          responseDelay: Duration.zero,
+          now: () => fixedNow,
+        );
+        var online = true;
+        final cubit = ApprovalRequestsCubit(api, isOnline: () => online);
+        addTearDown(cubit.close);
 
-      await cubit.loadRequests();
-      await cubit.submitDecision(1, ApprovalDecision.approve);
+        await cubit.loadRequests();
+        await cubit.submitDecision(1, ApprovalDecision.approve);
 
-      online = false;
-      await cubit.checkDecisionOutcome(1);
+        online = false;
+        await cubit.checkDecisionOutcome(1);
 
-      var state = cubit.state as ApprovalRequestsSuccess;
-      final unknown = state.operationFor(1) as DecisionUnknownOutcome;
-      expect(unknown.message, contains('اتصال'));
+        var state = cubit.state as ApprovalRequestsSuccess;
+        final unknown = state.operationFor(1) as DecisionUnknownOutcome;
+        expect(unknown.message, contains('اتصال'));
 
-      online = true;
-      await cubit.checkDecisionOutcome(1);
+        online = true;
+        await cubit.checkDecisionOutcome(1);
 
-      state = cubit.state as ApprovalRequestsSuccess;
-      expect(state.operationFor(1), isA<DecisionConfirmedSuccess>());
-      expect(state.requests.single.version, 2);
-    });
+        state = cubit.state as ApprovalRequestsSuccess;
+        expect(state.operationFor(1), isA<DecisionConfirmedSuccess>());
+        expect(state.requests.single.version, 2);
+      },
+    );
 
-    test('a request that never reached the server is retried with the same id',
-        () async {
-      final api = MockApprovalApi(
-        initialRequests: [buildRequest()],
-        scenario: MockApiScenario.failBeforeExecution,
-        responseDelay: Duration.zero,
-        now: () => fixedNow,
-      );
-      var generatedIdCount = 0;
-      final cubit = ApprovalRequestsCubit(
-        api,
-        isOnline: () => true,
-        createDecisionId: () => 'decision-${++generatedIdCount}',
-      );
-      addTearDown(cubit.close);
+    test(
+      'a request that never reached the server is retried with the same id',
+      () async {
+        final api = MockApprovalApi(
+          initialRequests: [buildRequest()],
+          scenario: MockApiScenario.failBeforeExecution,
+          responseDelay: Duration.zero,
+          now: () => fixedNow,
+        );
+        var generatedIdCount = 0;
+        final cubit = ApprovalRequestsCubit(
+          api,
+          isOnline: () => true,
+          createDecisionId: () => 'decision-${++generatedIdCount}',
+        );
+        addTearDown(cubit.close);
 
-      await cubit.loadRequests();
-      await cubit.submitDecision(1, ApprovalDecision.approve);
-      await cubit.checkDecisionOutcome(1);
+        await cubit.loadRequests();
+        await cubit.submitDecision(1, ApprovalDecision.approve);
+        await cubit.checkDecisionOutcome(1);
 
-      var state = cubit.state as ApprovalRequestsSuccess;
-      final unknown = state.operationFor(1) as DecisionUnknownOutcome;
-      expect(unknown.message, contains('لم تظهر'));
+        var state = cubit.state as ApprovalRequestsSuccess;
+        final unknown = state.operationFor(1) as DecisionUnknownOutcome;
+        expect(unknown.message, contains('لم تظهر'));
 
-      api.scenario = MockApiScenario.normal;
-      await cubit.retryUnknownDecision(1);
+        api.scenario = MockApiScenario.normal;
+        await cubit.retryUnknownDecision(1);
 
-      state = cubit.state as ApprovalRequestsSuccess;
-      expect(generatedIdCount, 1);
-      expect(state.operationFor(1), isA<DecisionConfirmedSuccess>());
-      expect(state.requests.single.version, 2);
-    });
+        state = cubit.state as ApprovalRequestsSuccess;
+        expect(generatedIdCount, 1);
+        expect(state.operationFor(1), isA<DecisionConfirmedSuccess>());
+        expect(state.requests.single.version, 2);
+      },
+    );
 
-    test('a refresh resolves an unknown outcome by asking the server', () async {
-      final api = MockApprovalApi(
-        initialRequests: [buildRequest()],
-        scenario: MockApiScenario.loseResponseAfterExecution,
-        responseDelay: Duration.zero,
-        now: () => fixedNow,
-      );
-      final cubit = ApprovalRequestsCubit(api, isOnline: () => true);
-      addTearDown(cubit.close);
+    test(
+      'a refresh resolves an unknown outcome by asking the server',
+      () async {
+        final api = MockApprovalApi(
+          initialRequests: [buildRequest()],
+          scenario: MockApiScenario.loseResponseAfterExecution,
+          responseDelay: Duration.zero,
+          now: () => fixedNow,
+        );
+        final cubit = ApprovalRequestsCubit(api, isOnline: () => true);
+        addTearDown(cubit.close);
 
-      await cubit.loadRequests();
-      await cubit.submitDecision(1, ApprovalDecision.approve);
+        await cubit.loadRequests();
+        await cubit.submitDecision(1, ApprovalDecision.approve);
 
-      await cubit.refreshRequests();
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+        await cubit.refreshRequests();
+        await Future<void>.delayed(const Duration(milliseconds: 10));
 
-      final state = cubit.state as ApprovalRequestsSuccess;
-      expect(state.operationFor(1), isA<DecisionConfirmedSuccess>());
-      expect(state.requests.single.status, ApprovalStatus.approved);
-    });
+        final state = cubit.state as ApprovalRequestsSuccess;
+        expect(state.operationFor(1), isA<DecisionConfirmedSuccess>());
+        expect(state.requests.single.status, ApprovalStatus.approved);
+      },
+    );
   });
 
   group('rejection follows the server answer', () {

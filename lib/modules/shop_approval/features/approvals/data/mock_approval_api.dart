@@ -157,6 +157,16 @@ class MockApprovalApi implements ApprovalApi {
       attentionMessage: attentionMessage,
     );
   }
+
+  @override
+  Future<void> cancelRequest(int requestId) async {
+    await Future.delayed(responseDelay);
+
+    final current = _requests[requestId];
+    if (current != null && current.status == ApprovalStatus.pending) {
+      _requests.remove(requestId);
+    }
+  }
 }
 
 class _ProcessedDecision {

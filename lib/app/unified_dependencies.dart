@@ -1,4 +1,5 @@
 import 'package:app_links/app_links.dart';
+import 'package:gold_shop_app/app/monitoring_gold_sale_price_repo.dart';
 import 'package:gold_shop_app/modules/auth_notification/core/app_dependencies.dart';
 import 'package:gold_shop_app/modules/debts_payment/data/local/app_database.dart';
 import 'package:gold_shop_app/modules/debts_payment/data/mock/mock_debt_api.dart';
@@ -6,7 +7,6 @@ import 'package:gold_shop_app/modules/debts_payment/data/mock/mock_network.dart'
 import 'package:gold_shop_app/modules/debts_payment/data/repos/payment_repo.dart';
 import 'package:gold_shop_app/modules/debts_payment/data/services/device_connectivity_observer.dart';
 import 'package:gold_shop_app/modules/debts_payment/data/services/sync_worker.dart';
-import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/data/gold_sale_demo_price_repo.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_price_repo.dart';
 import 'package:gold_shop_app/modules/shop_approval/core/connectivity/connectivity_service.dart'
     as approval_conn;
@@ -66,7 +66,7 @@ class UnifiedDependencies {
 
     await monitoring_locator.setupDependencies();
 
-    const goldPriceRepo = GoldSaleDemoPriceRepo();
+    final goldPriceRepo = MonitoringGoldSalePriceRepo();
 
     return UnifiedDependencies(
       authDependencies: authDeps,

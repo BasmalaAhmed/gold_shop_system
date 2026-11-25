@@ -19,7 +19,7 @@ class AppBottomNav extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.cardBorder)),
+        border: Border(bottom: BorderSide(color: AppColors.cardBorder)),
       ),
       child: SafeArea(
         top: false,

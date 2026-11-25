@@ -85,34 +85,47 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _selectedIndex == 0
-          ? CustomerDebtView(
-              customerId: 'customer-001',
-              repository: widget.repository,
-              api: widget.api,
-              network: widget.network,
-              syncCompleted: _syncOnReconnect.syncCompleted,
-              onChanged: _onPaymentSaved,
-            )
-          : PendingOperationsView(
-              repository: widget.repository,
-              api: widget.api,
-              network: widget.network,
-              syncOnReconnect: _syncOnReconnect,
-              onChanged: _onPaymentSaved,
+      body: Column(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: ValueListenableBuilder<QueueSummary>(
+              valueListenable: _summary,
+              builder: (context, summary, child) {
+                return AppBottomNav(
+                  selectedIndex: _selectedIndex,
+                  summary: summary,
+                  onSelected: (index) {
+                    setState(() => _selectedIndex = index);
+                    _refreshSummary();
+                  },
+                );
+              },
             ),
-      bottomNavigationBar: ValueListenableBuilder<QueueSummary>(
-        valueListenable: _summary,
-        builder: (context, summary, child) {
-          return AppBottomNav(
-            selectedIndex: _selectedIndex,
-            summary: summary,
-            onSelected: (index) {
-              setState(() => _selectedIndex = index);
-              _refreshSummary();
-            },
-          );
-        },
+          ),
+          Expanded(
+            child: MediaQuery.removePadding(
+              context: context,
+              removeTop: true,
+              child: _selectedIndex == 0
+                  ? CustomerDebtView(
+                      customerId: 'customer-001',
+                      repository: widget.repository,
+                      api: widget.api,
+                      network: widget.network,
+                      syncCompleted: _syncOnReconnect.syncCompleted,
+                      onChanged: _onPaymentSaved,
+                    )
+                  : PendingOperationsView(
+                      repository: widget.repository,
+                      api: widget.api,
+                      network: widget.network,
+                      syncOnReconnect: _syncOnReconnect,
+                      onChanged: _onPaymentSaved,
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }

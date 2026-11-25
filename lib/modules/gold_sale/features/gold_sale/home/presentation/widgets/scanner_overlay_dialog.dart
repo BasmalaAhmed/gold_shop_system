@@ -155,16 +155,19 @@ class ScannerOverlayDialog extends StatelessWidget {
                           prod.status == GoldItemStatus.inWorkshop;
                       final isReserved = prod.status == GoldItemStatus.reserved;
                       final isTransit = prod.status == GoldItemStatus.inTransit;
+                      final isSold = prod.status == GoldItemStatus.sold;
 
                       String subtitle;
                       if (isWorkshop) {
                         subtitle = 'في الورشة · لا تُباع';
                       } else if (isAdded) {
                         subtitle = 'مضافة في الفاتورة';
+                      } else if (isSold) {
+                        subtitle = 'مباعة · ${prod.name} · عيار ${prod.karat}';
                       } else if (isReserved) {
-                        subtitle = 'القطعة محجوزة او مباعة';
+                        subtitle = 'القطعة محجوزة · ${prod.name} · عيار ${prod.karat}';
                       } else if (isTransit) {
-                        subtitle = 'مضافة في الشحن';
+                        subtitle = 'قيد النقل';
                       } else {
                         subtitle = 'متاحة · ${prod.name} · عيار ${prod.karat}';
                       }

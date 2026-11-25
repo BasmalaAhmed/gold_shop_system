@@ -1,10 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_item_status.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_calc.dart';
 import 'package:gold_shop_app/modules/gold_sale/features/gold_sale/domain/gold_sale_product.dart';
 
 class GoldSaleDemoCatalog {
   GoldSaleDemoCatalog();
-  final Set<String> _soldCodes = <String>{};
+
+  static final Set<String> _soldCodes = <String>{};
+  @visibleForTesting
+  static void clearSoldForTests() => _soldCodes.clear();
 
   static const Map<String, GoldSaleProduct> _records = {
     'DEMO-1001': GoldSaleProduct(
