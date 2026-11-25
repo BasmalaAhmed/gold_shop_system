@@ -5,33 +5,58 @@ import 'package:gold_shop_app/modules/shop_approval/core/connectivity/connectivi
 import 'package:gold_shop_app/modules/shop_approval/features/approvals/presentation/manager/approval_requests_cubit/approval_requests_cubit.dart';
 
 class AutoRefresh extends StatefulWidget {
-  const AutoRefresh({super.key, required this.child});
+  const AutoRefresh({super.key, required this.child, this.active = true});
+
   final Widget child;
+  final bool active;
+
   @override
   State<AutoRefresh> createState() => _AutoRefreshState();
 }
 
 class _AutoRefreshState extends State<AutoRefresh> with WidgetsBindingObserver {
   Timer? _timer;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _timer = Timer.periodic(const Duration(seconds: 20), (_) => _refresh());
+    if (widget.active) _startTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant AutoRefresh oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active == oldWidget.active) return;
+
+    if (widget.active) {
+      _startTimer();
+      _refresh();
+    } else {
+      _stopTimer();
+    }
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _stopTimer();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
+  void _startTimer() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 20), (_) => _refresh());
+  }
+
+  void _stopTimer() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _refresh();
-    }
+    if (state == AppLifecycleState.resumed && widget.active) _refresh();
   }
 
   void _refresh() {
@@ -43,7 +68,9 @@ class _AutoRefreshState extends State<AutoRefresh> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return BlocListener<ConnectivityCubit, bool>(
       listenWhen: (previous, current) => !previous && current,
-      listener: (context, _) => _refresh(),
+      listener: (context, _) {
+        if (widget.active) _refresh();
+      },
       child: widget.child,
     );
   }

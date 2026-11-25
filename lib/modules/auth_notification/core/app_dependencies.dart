@@ -47,7 +47,9 @@ class AppDependencies {
 
     final sessionManager = SessionManager(sessionRepo, sessionRefreshRepo);
 
-    await sessionManager.initialize();
+    try {
+      await sessionManager.initialize();
+    } catch (_) {}
 
     final mockAuthApi = MockAuthApi();
 

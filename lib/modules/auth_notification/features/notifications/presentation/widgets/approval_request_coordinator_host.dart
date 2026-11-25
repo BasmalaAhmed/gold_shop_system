@@ -4,6 +4,7 @@ import 'package:app_links/app_links.dart';
 import 'package:gold_shop_app/modules/auth_notification/features/auth/presentation/manager/auth_cubit/auth_cubit.dart';
 import 'package:gold_shop_app/modules/auth_notification/features/notifications/domain/entities/approval_request.dart';
 import 'package:gold_shop_app/modules/auth_notification/features/notifications/presentation/manager/approval_coordinator/approval_cubit.dart';
+import 'package:gold_shop_app/modules/auth_notification/features/notifications/presentation/manager/approval_coordinator/approval_state.dart';
 import 'package:gold_shop_app/modules/auth_notification/features/notifications/presentation/manager/approval_request_coordinator.dart';
 import 'package:gold_shop_app/modules/auth_notification/features/notifications/presentation/manager/pending_approval_manager.dart';
 import 'package:gold_shop_app/modules/auth_notification/features/notifications/presentation/views/approval_request_view.dart';
@@ -47,10 +48,10 @@ class _ApprovalRequestCoordinatorHostState
     );
 
     widget.appLinks.getInitialLink().then((uri) {
-    if (uri != null) {
-      _coordinator.handleLink(uri);
-    }
-  });
+      if (uri != null) {
+        _coordinator.handleLink(uri);
+      }
+    });
 
     _linkSubscription = widget.appLinks.uriLinkStream.listen((uri) {
       _coordinator.handleLink(uri);
@@ -74,6 +75,24 @@ class _ApprovalRequestCoordinatorHostState
 
   @override
   Widget build(BuildContext context) {
-    return widget.builder(context, _coordinator);
+    return BlocListener<ApprovalCubit, ApprovalState>(
+      listenWhen: (previous, current) => current is ApprovalFailure,
+      listener: (context, state) {
+        if (state is! ApprovalFailure) return;
+
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              action: SnackBarAction(
+                label: 'إعادة المحاولة',
+                onPressed: () => unawaited(_coordinator.retryPendingRequest()),
+              ),
+            ),
+          );
+      },
+      child: widget.builder(context, _coordinator),
+    );
   }
 }

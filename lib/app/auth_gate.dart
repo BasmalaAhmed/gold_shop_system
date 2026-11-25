@@ -37,6 +37,9 @@ class _UnifiedAuthGateState extends State<UnifiedAuthGate> {
         if (state is! AuthLoading && state is! AuthInitial) {
           _lastStableState = state;
         }
+        if (state is AuthUnauthenticated) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
       },
       builder: (context, state) {
         final currentState = state is AuthLoading ? _lastStableState : state;

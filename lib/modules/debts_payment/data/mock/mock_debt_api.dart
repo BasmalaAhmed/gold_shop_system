@@ -63,16 +63,15 @@ class MockDebtApi {
         version INTEGER NOT NULL
       )
     ''');
-          if (oldVersion < 3) {
-            await db.execute(
-              'ALTER TABLE server_debts ADD COLUMN due_date TEXT',
-            );
-          }
 
           await db.execute('''
       INSERT INTO server_versions (customer_id, version)
       SELECT DISTINCT customer_id, 1 FROM server_debts
     ''');
+        }
+
+        if (oldVersion < 3) {
+          await db.execute('ALTER TABLE server_debts ADD COLUMN due_date TEXT');
         }
       },
     );

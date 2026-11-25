@@ -41,7 +41,7 @@ class BranchMonitoringCubit extends Cubit<BranchMonitoringState> {
 
   Future<void> load() async {
     emit(const BranchMonitoringLoading());
-
+    _watchConnectivity();
     try {
       final branches = await _monitoringRepo.getBranches();
       final requestId = ++_requestId;
@@ -55,7 +55,6 @@ class BranchMonitoringCubit extends Cubit<BranchMonitoringState> {
       if (isClosed || requestId != _requestId) return;
 
       _watchGoldPrice();
-      _watchConnectivity();
     } catch (error) {
       if (isClosed) return;
 
@@ -386,6 +385,15 @@ class BranchMonitoringCubit extends Cubit<BranchMonitoringState> {
       }
 
       if (isOnline) {
+        final latestState = state;
+
+        if (latestState is BranchMonitoringFailure &&
+            latestState.previous == null &&
+            latestState.failedScopeId == null) {
+          load();
+          return;
+        }
+
         refresh();
         _loadInitialGoldPrice();
       }

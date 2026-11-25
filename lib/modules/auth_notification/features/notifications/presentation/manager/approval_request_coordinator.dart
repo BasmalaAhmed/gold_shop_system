@@ -48,6 +48,8 @@ class ApprovalRequestCoordinator {
     return accepted;
   }
 
+  Future<void> retryPendingRequest() => _processPendingRequest();
+
   void _onAuthStateChanged(AuthState state) {
     _authStateVersion++;
 

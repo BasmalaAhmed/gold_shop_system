@@ -74,8 +74,9 @@ class _UnifiedMainShellState extends State<UnifiedMainShell> {
             connectivityObserver: widget.dependencies.debtsConnectivityObserver,
           ),
 
-          const AutoRefresh(
-            child: ApprovalRequestsView(),
+          AutoRefresh(
+            active: _currentIndex == 3,
+            child: const ApprovalRequestsView(),
           ),
 
           auth_view.HomeView(
@@ -104,27 +105,42 @@ class _UnifiedMainShellState extends State<UnifiedMainShell> {
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.point_of_sale_outlined),
-              selectedIcon: Icon(Icons.point_of_sale_rounded, color: UnifiedTheme.teal),
+              selectedIcon: Icon(
+                Icons.point_of_sale_rounded,
+                color: UnifiedTheme.teal,
+              ),
               label: 'بيع الذهب',
             ),
             NavigationDestination(
               icon: Icon(Icons.insights_outlined),
-              selectedIcon: Icon(Icons.insights_rounded, color: UnifiedTheme.teal),
+              selectedIcon: Icon(
+                Icons.insights_rounded,
+                color: UnifiedTheme.teal,
+              ),
               label: 'مراقبة الفرع',
             ),
             NavigationDestination(
               icon: Icon(Icons.payments_outlined),
-              selectedIcon: Icon(Icons.payments_rounded, color: UnifiedTheme.teal),
+              selectedIcon: Icon(
+                Icons.payments_rounded,
+                color: UnifiedTheme.teal,
+              ),
               label: 'تحصيل الديون',
             ),
             NavigationDestination(
               icon: Icon(Icons.fact_check_outlined),
-              selectedIcon: Icon(Icons.fact_check_rounded, color: UnifiedTheme.teal),
+              selectedIcon: Icon(
+                Icons.fact_check_rounded,
+                color: UnifiedTheme.teal,
+              ),
               label: 'الموافقات',
             ),
             NavigationDestination(
               icon: Icon(Icons.manage_accounts_outlined),
-              selectedIcon: Icon(Icons.manage_accounts_rounded, color: UnifiedTheme.teal),
+              selectedIcon: Icon(
+                Icons.manage_accounts_rounded,
+                color: UnifiedTheme.teal,
+              ),
               label: 'الحساب',
             ),
           ],
