@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:gold_shop_app/modules/shop_approval/app/approval_debug_panel.dart';
 import 'package:gold_shop_app/modules/shop_approval/app/auto_refresh.dart';
 import 'package:gold_shop_app/modules/shop_approval/core/app_theme.dart';
 import 'package:gold_shop_app/modules/shop_approval/core/connectivity/connectivity_cubit.dart';
@@ -10,8 +11,6 @@ import 'package:gold_shop_app/modules/shop_approval/features/approvals/data/mock
 import 'package:gold_shop_app/modules/shop_approval/features/approvals/data/mock_approval_api.dart';
 import 'package:gold_shop_app/modules/shop_approval/features/approvals/data/mock_approval_data.dart';
 import 'package:gold_shop_app/modules/shop_approval/features/approvals/presentation/manager/approval_requests_cubit/approval_requests_cubit.dart';
-import 'package:gold_shop_app/modules/shop_approval/features/approvals/presentation/manager/approval_requests_cubit/approval_requests_state.dart';
-import 'package:gold_shop_app/modules/shop_approval/features/approvals/presentation/utils/approval_request_presentation.dart';
 import 'package:gold_shop_app/modules/shop_approval/features/approvals/presentation/views/approval_requests_view.dart';
 
 class ShopApprovalApp extends StatefulWidget {
@@ -73,56 +72,12 @@ class _ShopApprovalAppState extends State<ShopApprovalApp> {
                 child: SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.all(8),
-                    child: _DebugPanel(api: _api),
+                    child: ApprovalDebugPanel(api: _api),
                   ),
                 ),
               ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _DebugPanel extends StatelessWidget {
-  const _DebugPanel({required this.api});
-
-  final MockApprovalApi api;
-
-  @override
-  Widget build(BuildContext context) {
-    final cubit = context.read<ApprovalRequestsCubit>();
-
-    return Material(
-      color: const Color(0xA6000000),
-      borderRadius: BorderRadius.circular(20),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.bolt_rounded, color: Colors.white),
-            onPressed: () {
-              final state = cubit.state;
-              if (state is! ApprovalRequestsSuccess) return;
-
-              final id = cubit.viewingRequestId ?? 4;
-              final request = state.requests
-                  .where((item) => item.requestId == id)
-                  .firstOrNull;
-
-              if (request == null || !request.isPending) return;
-
-              api.simulateExternalChange(
-                id,
-                amountInPiastres: request.amountInPiastres + 50000,
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            onPressed: cubit.refreshRequests,
-          ),
-        ],
       ),
     );
   }

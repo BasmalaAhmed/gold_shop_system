@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -7,6 +8,7 @@ import 'package:gold_shop_app/app/auth_gate.dart';
 import 'package:gold_shop_app/app/unified_dependencies.dart';
 import 'package:gold_shop_app/core/unified_theme.dart';
 import 'package:gold_shop_app/modules/auth_notification/features/notifications/presentation/widgets/approval_request_coordinator_host.dart';
+import 'package:gold_shop_app/modules/shop_approval/app/approval_debug_panel.dart';
 import 'package:gold_shop_app/modules/shop_approval/core/connectivity/connectivity_cubit.dart';
 import 'package:gold_shop_app/modules/shop_approval/features/approvals/presentation/manager/approval_requests_cubit/approval_requests_cubit.dart';
 
@@ -69,6 +71,25 @@ class _UnifiedGoldShopAppState extends State<UnifiedGoldShopApp> {
               dependencies: widget.dependencies,
             );
           },
+        ),
+        builder: (context, child) => Stack(
+          fit: StackFit.expand,
+          children: [
+            child!,
+            if (kDebugMode)
+              Positioned(
+                top: 0,
+                left: 0,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: ApprovalDebugPanel(
+                      api: widget.dependencies.approvalApi,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
