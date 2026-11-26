@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:gold_shop_app/app/monitoring_sale_recorder.dart';
 import 'package:gold_shop_app/app/unified_dependencies.dart';
 import 'package:gold_shop_app/core/unified_theme.dart';
 import 'package:gold_shop_app/modules/auth_notification/features/auth/presentation/views/home_view.dart'
@@ -34,6 +35,7 @@ class UnifiedMainShell extends StatefulWidget {
 
 class _UnifiedMainShellState extends State<UnifiedMainShell> {
   int _currentIndex = 0;
+  final _saleRecorder = MonitoringSaleRecorder();
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +45,7 @@ class _UnifiedMainShellState extends State<UnifiedMainShell> {
         children: [
           gold_view.HomeView(
             priceRepository: widget.dependencies.goldPriceRepo,
+            onSaleCompleted: _saleRecorder.record,
           ),
 
           AccountScope(

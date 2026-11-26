@@ -31,10 +31,22 @@ import 'package:gold_shop_app/modules/shop_approval/features/approvals/presentat
 import 'package:gold_shop_app/modules/shop_approval/features/approvals/presentation/manager/approval_requests_cubit/approval_requests_state.dart';
 import 'package:gold_shop_app/modules/shop_approval/models/approval_request.dart';
 
+typedef SaleCompletedCallback =
+    void Function({
+      required List<String> itemCodes,
+      required int totalPiasters,
+      required int cashPiasters,
+    });
+
 class HomeView extends StatefulWidget {
-  const HomeView({super.key, required this.priceRepository});
+  const HomeView({
+    super.key,
+    required this.priceRepository,
+    this.onSaleCompleted,
+  });
 
   final GoldSalePriceRepo priceRepository;
+  final SaleCompletedCallback? onSaleCompleted;
 
   @override
   State<HomeView> createState() => _HomeViewState();
@@ -600,6 +612,18 @@ class _HomeViewState extends State<HomeView> {
       for (final item in _cart.items) {
         _catalog.markSold(item.code);
       }
+
+      final cashPiasters = payments
+          .where((p) => p.method == GoldSalePaymentMethod.cash)
+          .fold<int>(0, (sum, p) => sum + p.amountPiasters);
+
+      try {
+        widget.onSaleCompleted?.call(
+          itemCodes: _cart.items.map((item) => item.code).toList(),
+          totalPiasters: _cart.totalPiasters,
+          cashPiasters: cashPiasters,
+        );
+      } catch (_) {}
 
       if (mounted) {
         setState(() {

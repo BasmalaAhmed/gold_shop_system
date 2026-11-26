@@ -43,6 +43,7 @@ class MockMonitoringApi implements MonitoringApi, GoldPriceApi {
   late GoldPriceModel _goldPrice;
 
   Timer? _timer;
+  Timer? _goldTimer;
   int _operationCounter = 0;
 
   void _initialize() {
@@ -123,7 +124,8 @@ class MockMonitoringApi implements MonitoringApi, GoldPriceApi {
   }
 
   static const Duration _defaultDelay = Duration(milliseconds: 300);
-
+  static const Duration defaultOperationEvery = Duration(seconds: 20);
+  static const Duration defaultGoldPriceEvery = Duration(minutes: 10);
   static const Duration _slowScopeDelay = Duration(seconds: 2);
 
   Future<void> _simulateNetworkDelay({Duration delay = _defaultDelay}) async {
@@ -134,91 +136,127 @@ class MockMonitoringApi implements MonitoringApi, GoldPriceApi {
     }
   }
 
-  void startSimulation({Duration every = const Duration(seconds: 3)}) {
-    _timer?.cancel();
-    _timer = Timer.periodic(every, (_) => _tick());
+void startSimulation({
+  Duration every = defaultOperationEvery,
+  Duration? goldPriceEvery = defaultGoldPriceEvery,
+}) {
+  _timer?.cancel();
+  _goldTimer?.cancel();
+
+  _timer = Timer.periodic(every, (_) => _tick());
+
+  if (goldPriceEvery != null) {
+    _goldTimer = Timer.periodic(goldPriceEvery, (_) => _updateGoldPrice());
+  }
+}
+
+void _tick() {
+  if (!connectivity.isOnline) return;
+
+  final branch = _branches[_random.nextInt(_branches.length)];
+
+  final amount = (1 + _random.nextInt(20)) * 500;
+  final now = DateTime.now().toUtc();
+
+  final operation = RecentOperationModel(
+    id: 'op-${++_operationCounter}',
+    title: 'بيع ذهب - ${branch.name}',
+    amount: amount,
+    at: now,
+  );
+
+  _applySale(branch.id, amount, amount, operation, now);
+  _applySale(allScope, amount, amount, operation, now);
+}
+
+void recordSale({
+  required String branchId,
+  required int salesAmount,
+  required int cashAmount,
+  String? itemsLabel,
+}) {
+  final branch = _branches.where((b) => b.id == branchId).firstOrNull;
+
+  if (branch == null) {
+    throw ArgumentError('Unknown branch: $branchId');
   }
 
-  void _tick() {
-    if (!connectivity.isOnline) return;
+  final now = DateTime.now().toUtc();
+  final label = (itemsLabel == null || itemsLabel.isEmpty)
+      ? ''
+      : ' ($itemsLabel)';
 
-    final branch = _branches[_random.nextInt(_branches.length)];
+  final operation = RecentOperationModel(
+    id: 'op-${++_operationCounter}',
+    title: 'بيع ذهب$label - ${branch.name}',
+    amount: salesAmount,
+    at: now,
+  );
 
-    final amount = (1 + _random.nextInt(20)) * 500;
-    final now = DateTime.now().toUtc();
+  _applySale(branch.id, salesAmount, cashAmount, operation, now);
+  _applySale(allScope, salesAmount, cashAmount, operation, now);
+}
 
-    final operation = RecentOperationModel(
-      id: 'op-${++_operationCounter}',
-      title: 'بيع ذهب - ${branch.name}',
-      amount: amount,
-      at: now,
-    );
+void _applySale(
+  String scopeId,
+  int salesDelta,
+  int cashDelta,
+  RecentOperationModel operation,
+  DateTime now,
+) {
+  final state = _scopes[scopeId]!;
 
-    _applySale(branch.id, amount, operation, now);
-    _applySale(allScope, amount, operation, now);
+  state.sequence++;
+  state.sales += salesDelta;
+  state.cash += cashDelta;
 
-    if (_random.nextInt(4) == 0) {
-      _updateGoldPrice();
-    }
+  state.operations.insert(0, operation);
+
+  if (state.operations.length > 20) {
+    state.operations.removeLast();
   }
 
-  void _applySale(
-    String scopeId,
-    int amount,
-    RecentOperationModel operation,
-    DateTime now,
-  ) {
-    final state = _scopes[scopeId]!;
+  final update = MonitoringUpdateModel(
+    scopeId: scopeId,
+    sequence: state.sequence,
+    salesDelta: salesDelta,
+    cashDelta: cashDelta,
+    createdAt: now,
+    operation: operation,
+  );
 
-    state.sequence++;
-    state.sales += amount;
-    state.cash += amount;
+  final controller = _updateControllers[scopeId];
 
-    state.operations.insert(0, operation);
+  if (controller != null && controller.hasListener) {
+    controller.add(update);
+  }
+}
 
-    if (state.operations.length > 20) {
-      state.operations.removeLast();
-    }
+void _updateGoldPrice() {
+  if (!connectivity.isOnline) return;
+  final change = _random.nextInt(21) - 10;
 
-    final update = MonitoringUpdateModel(
-      scopeId: scopeId,
-      sequence: state.sequence,
-      salesDelta: amount,
-      cashDelta: amount,
-      createdAt: now,
-      operation: operation,
-    );
+  _goldPrice = GoldPriceModel(
+    value: _goldPrice.value + change,
+    sequence: _goldPrice.sequence + 1,
+    updatedAt: DateTime.now().toUtc(),
+  );
 
-    final controller = _updateControllers[scopeId];
+  if (_goldController.hasListener) {
+    _goldController.add(_goldPrice);
+  }
+}
 
-    if (controller != null && controller.hasListener) {
-      controller.add(update);
-    }
+void dispose() {
+  _timer?.cancel();
+  _goldTimer?.cancel();
+
+  for (final controller in _updateControllers.values) {
+    controller.close();
   }
 
-  void _updateGoldPrice() {
-    final change = _random.nextInt(41) - 20;
-
-    _goldPrice = GoldPriceModel(
-      value: _goldPrice.value + change,
-      sequence: _goldPrice.sequence + 1,
-      updatedAt: DateTime.now().toUtc(),
-    );
-
-    if (_goldController.hasListener) {
-      _goldController.add(_goldPrice);
-    }
-  }
-
-  void dispose() {
-    _timer?.cancel();
-
-    for (final controller in _updateControllers.values) {
-      controller.close();
-    }
-
-    _goldController.close();
-  }
+  _goldController.close();
+}
 }
 
 class _ScopeState {
