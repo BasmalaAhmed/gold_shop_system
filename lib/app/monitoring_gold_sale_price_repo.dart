@@ -10,19 +10,20 @@ class MonitoringGoldSalePriceRepo implements GoldSalePriceRepo {
 
   final GoldSalePriceRepo _fallback;
 
-  static const int _saleMarkupPiasters = 20000;
-  static const int _buyMarkupPiasters = 5000;
+  static const int _saleMarkupPiasters = 0;
+  static const int _buyMarkupPiasters = -15000;
 
+  int? _lastPrice21Piasters;
   Future<int?> _price21Piasters() async {
     try {
       final api = monitoring_locator
           .getIt<MockMonitoringApiRegistry>()
           .forAccount(AccountSession.defaultAccountId);
       final price = await api.fetchGoldPrice();
+      _lastPrice21Piasters = price.value * 100;
       return price.value * 100;
-    } catch (_) {
-      return null;
-    }
+    } catch (_) {}
+    return _lastPrice21Piasters;
   }
 
   int _forKarat(int price21Piasters, int karat) =>

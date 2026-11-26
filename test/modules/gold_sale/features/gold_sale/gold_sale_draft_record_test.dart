@@ -58,7 +58,7 @@ void main() {
       ),
     );
 
-    final loaded = await GoldSaleDraftRepo().load(); // repo جديد
+    final loaded = await GoldSaleDraftRepo().load();
     expect(loaded, isNotNull);
 
     final restored = GoldSaleCart()

@@ -103,6 +103,9 @@ class _ScrapGoldBottomSheetState extends State<ScrapGoldBottomSheet> {
 
   int get _deductionBasisPoints => (_deductionPercent * 100).round();
 
+  int get _buyPriceForSelectedKarat =>
+      roundHalfUp(widget.buyPricePerGramPiasters * _selectedKarat, 21);
+
   @override
   Widget build(BuildContext context) {
     TradeInResult? result;
@@ -111,7 +114,7 @@ class _ScrapGoldBottomSheetState extends State<ScrapGoldBottomSheet> {
         TradeInInput(
           weightMg: _weightMg,
           karat: _selectedKarat,
-          buyPricePerGramPiasters: widget.buyPricePerGramPiasters,
+          buyPricePerGramPiasters: _buyPriceForSelectedKarat,
           deductionBasisPoints: _deductionBasisPoints,
         ),
       );

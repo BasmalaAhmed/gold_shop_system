@@ -167,7 +167,6 @@ class SaleSuccessScreen extends StatelessWidget {
     );
   }
 
-  // Mobile Success View
   Widget _buildMobileSuccess({
     required String amountDueEgp,
     required String cashPaidEgp,
